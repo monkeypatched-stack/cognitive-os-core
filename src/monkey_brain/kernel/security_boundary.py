@@ -238,7 +238,7 @@ def _assert_idempotency(operation_id: str = "") -> None:
         _note("IDEMPOTENCY")
         return
     try:
-        from src.monkey_brain.api.idempotency import get_idempotency_store
+        from src.monkey_brain.kernel.idempotency_store import get_idempotency_store
 
         store = get_idempotency_store()
         if store is None or not store.is_available():
@@ -267,7 +267,7 @@ def _assert_idempotency(operation_id: str = "") -> None:
 
 def _release_admission(operation_id: str) -> None:
     try:
-        from src.monkey_brain.api.idempotency import get_idempotency_store
+        from src.monkey_brain.kernel.idempotency_store import get_idempotency_store
 
         get_idempotency_store().release(f"governed:{operation_id}")
     except Exception:
@@ -276,7 +276,7 @@ def _release_admission(operation_id: str) -> None:
 
 def _complete_admission(operation_id: str, body: dict[str, Any]) -> None:
     try:
-        from src.monkey_brain.api.idempotency import get_idempotency_store
+        from src.monkey_brain.kernel.idempotency_store import get_idempotency_store
 
         get_idempotency_store().complete(f"governed:{operation_id}", operation_id, body)
     except Exception:
@@ -296,7 +296,7 @@ def _reopen_admission_for_retry(operation_id: str) -> None:
     calling this.
     """
     try:
-        from src.monkey_brain.api.idempotency import get_idempotency_store
+        from src.monkey_brain.kernel.idempotency_store import get_idempotency_store
 
         get_idempotency_store().release(f"governed:{operation_id}")
     except Exception:

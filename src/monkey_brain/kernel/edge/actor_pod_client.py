@@ -84,7 +84,7 @@ async def actor_pod_request(
     checks. Raises ActorPodRequestError on any failure, never a fake result."""
     import httpx
 
-    from src.monkey_brain.api.internal_auth import internal_service_headers
+    from src.monkey_brain.actor_contract.internal_auth import internal_service_headers
 
     url = f"{actor_pod_base_url(actor_id)}{path}"
     headers = internal_service_headers()
