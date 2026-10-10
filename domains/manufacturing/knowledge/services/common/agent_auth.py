@@ -24,12 +24,12 @@ from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError
 
-from services.auth.helpers.tokens import decode_access_token
-from services.auth.helpers.agent_tokens import (
+from services.common.tokens import decode_access_token
+from services.common.agent_tokens import (
     decode_agent_access_token,
     decode_pipeline_token,
 )
-from services.auth.helpers.revocation import is_jti_revoked, is_agent_blocked
+from services.common.revocation import is_jti_revoked, is_agent_blocked
 
 logger = logging.getLogger(__name__)
 

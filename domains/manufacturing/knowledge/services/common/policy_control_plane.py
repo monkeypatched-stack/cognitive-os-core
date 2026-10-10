@@ -132,7 +132,7 @@ class PolicyControlPlane:
         if self._db is None:
             return []
         try:
-            from services.auth.helpers.rbac import resolve_permissions
+            from services.common.rbac import resolve_permissions
 
             return await resolve_permissions(self._db, role_ids)
         except Exception as exc:

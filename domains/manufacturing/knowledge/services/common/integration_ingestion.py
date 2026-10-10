@@ -9,7 +9,7 @@ from uuid import uuid4
 from fastapi import HTTPException, status
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
-from services.auth.helpers import nats_store
+from services.common import nats_store
 from services.common.data_transformation import RAW_INTEGRATION_SUBJECT
 from services.common.ontology_registry import load_integration_adapter
 

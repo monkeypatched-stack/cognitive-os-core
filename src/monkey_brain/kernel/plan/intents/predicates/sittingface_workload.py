@@ -168,11 +168,11 @@ async def sittingface_workload_question_answer(client, question, force=False):
             )
 
     try:
-        from src.monkey_brain.api.main import app
+        from src.monkey_brain.kernel.host_state import get_host_state
 
-        cognitive_runtime = getattr(getattr(app, "state", None), "cognitive_runtime", None)
-        policy = getattr(getattr(app, "state", None), "policy", None)
-        lemon = getattr(getattr(app, "state", None), "lemon", None)
+        cognitive_runtime = getattr(get_host_state(), "cognitive_runtime", None)
+        policy = getattr(get_host_state(), "policy", None)
+        lemon = getattr(get_host_state(), "lemon", None)
 
         from src.monkey_brain.kernel.execute.provider.llm_explorer import LLMExplorer
         from src.monkey_brain.kernel.execute.runtime.state import ExecutionState

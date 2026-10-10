@@ -5,8 +5,8 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError
 
-from services.auth.helpers.revocation import is_jti_revoked
-from services.auth.helpers.tokens import decode_access_token
+from services.common.revocation import is_jti_revoked
+from services.common.tokens import decode_access_token
 from services.common.compliance import set_compliance_user
 from services.common.tenant_scope import set_tenant_from_claims
 

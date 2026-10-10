@@ -40,7 +40,7 @@ async def issue(
     Kept for backward-compatibility. Prefer issue_step_token() for new code.
     """
     try:
-        from services.auth.helpers.agent_tokens import create_pipeline_token
+        from services.common.agent_tokens import create_pipeline_token
 
         identity = agent_identity or {}
         spiffe_id = identity.get("spiffe_id") or os.getenv(
@@ -72,7 +72,7 @@ async def issue_step_token(
     Returns None when auth secrets are not configured.
     """
     try:
-        from services.auth.helpers.agent_tokens import create_pipeline_token
+        from services.common.agent_tokens import create_pipeline_token
 
         identity = agent_identity or {}
         spiffe_id = identity.get("spiffe_id") or os.getenv(
@@ -103,7 +103,7 @@ def verify(
     Raises ValueError on pipeline_id mismatch.
     Raises jose.JWTError on invalid/expired token.
     """
-    from services.auth.helpers.agent_tokens import decode_pipeline_token
+    from services.common.agent_tokens import decode_pipeline_token
 
     claims = decode_pipeline_token(token)
     if expected_pipeline_id and claims.get("pipeline_id") != expected_pipeline_id:
@@ -117,7 +117,7 @@ def verify(
 def extract_pipeline_id(token: str) -> str | None:
     """Return pipeline_id from a pipeline token without full validation."""
     try:
-        from services.auth.helpers.agent_tokens import decode_pipeline_token
+        from services.common.agent_tokens import decode_pipeline_token
 
         return decode_pipeline_token(token).get("pipeline_id")
     except Exception:

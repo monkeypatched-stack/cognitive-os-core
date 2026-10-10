@@ -14,7 +14,7 @@ import logging
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from services.common.config import settings
-from services.auth.helpers.agent_tokens import AGENT_ACCESS_TOKEN_MINUTES
+from services.common.agent_tokens import AGENT_ACCESS_TOKEN_MINUTES
 
 logger = logging.getLogger(__name__)
 

@@ -614,7 +614,7 @@ async def append_audit_entry(
         )
     )
     try:
-        from services.auth.helpers import nats_store
+        from services.common import nats_store
 
         subject = await nats_store.publish_audit_event(queue_event)
         await raw_db[AUDIT_OUTBOX_COLLECTION].update_one(

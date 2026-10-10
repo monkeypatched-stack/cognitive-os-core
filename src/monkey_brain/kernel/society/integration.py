@@ -6970,7 +6970,7 @@ return new_count
                 logger.warning("Redis client close failed: %s", exc)
         if getattr(app.state, "planetary_runtime", None) is self:
             app.state.planetary_runtime = None
-        from src.monkey_brain.api.routes.payments import (
+        from src.monkey_brain.kernel.domains.payment_resolution import (
             get_default_planetary_runtime,
             set_default_planetary_runtime,
         )

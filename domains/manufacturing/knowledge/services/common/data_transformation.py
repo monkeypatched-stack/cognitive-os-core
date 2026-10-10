@@ -8,7 +8,7 @@ from uuid import uuid4
 
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
-from services.auth.helpers import nats_store
+from services.common import nats_store
 from services.common.embeddings import build_embedding
 from services.common.event_reducers import reduce_event_to_state
 from services.common.module_control import require_module_control_allowed

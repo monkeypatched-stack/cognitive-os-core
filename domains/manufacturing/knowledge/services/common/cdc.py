@@ -46,7 +46,7 @@ def cdc_event(
 
 async def publish_cdc_event(**kwargs) -> None:
     try:
-        from services.auth.helpers import nats_store
+        from services.common import nats_store
 
         await nats_store.publish_event(
             __import__("json").dumps(cdc_event(**kwargs), default=str).encode("utf-8"),

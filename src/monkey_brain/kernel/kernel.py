@@ -551,7 +551,7 @@ class Kernel:
     async def _phase_config(self, app: Any) -> None:
         from pathlib import Path
 
-        from src.monkey_brain.api.bootstrap import load_dotenv
+        from src.monkey_brain.kernel.bootstrap import load_dotenv
 
         load_dotenv(Path(__file__).parents[3] / ".env")
         from services.common.secrets import validate_hmac_secrets_from_env
@@ -658,7 +658,7 @@ class Kernel:
     # remaining strictly read-only.
 
     async def _phase_observability(self, app: Any) -> None:
-        from src.monkey_brain.api.bootstrap import init_lemon
+        from src.monkey_brain.kernel.bootstrap import init_lemon
 
         self.lemon = await init_lemon(app)
         app.state.lemon = self.lemon
@@ -694,7 +694,7 @@ class Kernel:
     # database implementations.
 
     async def _phase_persistence(self, app: Any) -> None:
-        from src.monkey_brain.api.bootstrap import init_persistence
+        from src.monkey_brain.kernel.bootstrap import init_persistence
 
         self.persistence = await init_persistence(app, self.lemon)
         self._health["persistence"] = ComponentHealth(name="persistence", state=HealthState.HEALTHY)
@@ -739,7 +739,7 @@ class Kernel:
     # dispatching, and executing cognitive workloads across the MonkeyBrain runtime.
 
     async def _phase_wolverine(self, app: Any) -> None:
-        from src.monkey_brain.api.bootstrap import init_runtime
+        from src.monkey_brain.kernel.bootstrap import init_runtime
 
         app.state._wolverine = await init_runtime(app, self.persistence, self.lemon)
         self._health["wolverine"] = ComponentHealth(name="wolverine", state=HealthState.HEALTHY)
@@ -782,7 +782,7 @@ class Kernel:
                 name="broca", state=HealthState.HEALTHY, message="already registered"
             )
             return
-        from src.monkey_brain.api.bootstrap import init_broca
+        from src.monkey_brain.kernel.bootstrap import init_broca
 
         await init_broca(app, app.state._wolverine)
         try:
@@ -816,7 +816,7 @@ class Kernel:
             logger.warning("[kernel] AgentBus/CapabilityBus wiring failed (non-fatal): %s", exc)
 
     async def _phase_providers(self, app: Any) -> None:
-        from src.monkey_brain.api.bootstrap import init_providers
+        from src.monkey_brain.kernel.bootstrap import init_providers
 
         await init_providers(app, app.state._wolverine)
         self._health["providers"] = ComponentHealth(name="providers", state=HealthState.HEALTHY)
@@ -856,7 +856,7 @@ class Kernel:
     # the entire MonkeyBrain runtime.
 
     async def _phase_pcp(self, app: Any) -> None:
-        from src.monkey_brain.api.bootstrap import init_pcp
+        from src.monkey_brain.kernel.bootstrap import init_pcp
 
         app.state._pcp = await init_pcp(app, self.persistence)
         self._health["pcp"] = ComponentHealth(
@@ -904,7 +904,7 @@ class Kernel:
     # and policy-driven communication across the MonkeyBrain ecosystem.
 
     async def _phase_identity(self, app: Any) -> None:
-        from src.monkey_brain.api.bootstrap import init_runtime_identity
+        from src.monkey_brain.kernel.bootstrap import init_runtime_identity
 
         await init_runtime_identity(app.state._wolverine)
         self._health["identity"] = ComponentHealth(name="identity", state=HealthState.HEALTHY)
@@ -947,7 +947,7 @@ class Kernel:
     # over time through reinforcement learning and intelligent workflow exploration.
 
     async def _phase_policy(self, app: Any) -> None:
-        from src.monkey_brain.api.bootstrap import init_policy
+        from src.monkey_brain.kernel.bootstrap import init_policy
 
         app.state._policy = await init_policy(app, self.persistence, self.lemon)
         self._health["policy"] = ComponentHealth(name="policy", state=HealthState.HEALTHY)
@@ -982,7 +982,7 @@ class Kernel:
     # cognitive feedback.
 
     async def _phase_learning(self, app: Any) -> None:
-        from src.monkey_brain.api.bootstrap import init_learning
+        from src.monkey_brain.kernel.bootstrap import init_learning
 
         app.state._learning = await init_learning(app, self.lemon)
         self._health["learning"] = ComponentHealth(name="learning", state=HealthState.HEALTHY)
@@ -1015,7 +1015,7 @@ class Kernel:
     # cognitive reasoning process.
 
     async def _phase_observer(self, app: Any) -> None:
-        from src.monkey_brain.api.bootstrap import init_observer
+        from src.monkey_brain.kernel.bootstrap import init_observer
 
         app.state._observer = await init_observer(app, self.lemon)
         self._health["observer"] = ComponentHealth(name="observer", state=HealthState.HEALTHY)
@@ -1050,7 +1050,7 @@ class Kernel:
     # Packs.
 
     async def _phase_sittingface(self, app: Any) -> None:
-        from src.monkey_brain.api.bootstrap import init_sittingface
+        from src.monkey_brain.kernel.bootstrap import init_sittingface
 
         await init_sittingface(app, app.state._wolverine, self.lemon)
         compiler = getattr(app.state, "somatic_compiler", None)
@@ -1099,7 +1099,7 @@ class Kernel:
     # MonkeyBrain runtime.
 
     async def _phase_execution_graph(self, app: Any) -> None:
-        from src.monkey_brain.api.bootstrap import init_execution_graph
+        from src.monkey_brain.kernel.bootstrap import init_execution_graph
 
         app.state._execution_graph = await init_execution_graph(app, app.state._wolverine, self.lemon)
         self._health["execution_graph"] = ComponentHealth(name="execution_graph", state=HealthState.HEALTHY)
@@ -1134,7 +1134,7 @@ class Kernel:
     # Cognitive Runtime.
 
     async def _phase_graph_store(self, app: Any) -> None:
-        from src.monkey_brain.api.bootstrap import init_graph_store
+        from src.monkey_brain.kernel.bootstrap import init_graph_store
 
         app.state._graph_store = await init_graph_store(app, app.state._wolverine, app.state._execution_graph)
         self._health["graph_store"] = ComponentHealth(
@@ -1213,7 +1213,7 @@ class Kernel:
     # MonkeyBrain Cognitive Runtime.
 
     async def _phase_data_routing(self, app: Any) -> None:
-        from src.monkey_brain.api.bootstrap import init_data_routing
+        from src.monkey_brain.kernel.bootstrap import init_data_routing
 
         app.state._data_routing = await init_data_routing(app, self.lemon)
         self._health["data_routing"] = ComponentHealth(
@@ -1252,7 +1252,7 @@ class Kernel:
     # underlying storage technologies.
 
     async def _phase_oql(self, app: Any) -> None:
-        from src.monkey_brain.api.bootstrap import init_oql
+        from src.monkey_brain.kernel.bootstrap import init_oql
 
         app.state._oql = await init_oql(app, self.lemon)
         self._health["oql"] = ComponentHealth(
@@ -1561,7 +1561,7 @@ class Kernel:
         # app.state.planetary_runtime from the way every real HTTP route
         # does -- this is the one place that real instance is reachable
         # without one.
-        from src.monkey_brain.api.routes.payments import set_default_planetary_runtime
+        from src.monkey_brain.kernel.domains.payment_resolution import set_default_planetary_runtime
 
         set_default_planetary_runtime(planetary)
         self._health["planetary"] = ComponentHealth(name="planetary", state=HealthState.HEALTHY)

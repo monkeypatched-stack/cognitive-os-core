@@ -121,7 +121,7 @@ class UnifiedExecutor:
         """
         try:
             # Get the CognitionEngine from the request context
-            from src.monkey_brain.api import bootstrap
+            from src.monkey_brain.kernel import bootstrap
 
             arch = getattr(bootstrap, "_architecture", None)
             if arch is None or not hasattr(arch, "_world"):

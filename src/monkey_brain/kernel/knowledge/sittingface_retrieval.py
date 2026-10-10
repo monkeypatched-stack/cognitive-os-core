@@ -257,9 +257,9 @@ class SittingFaceKnowledgeRetriever:
         if self._semantic_memory is not None:
             return self._semantic_memory
         try:
-            from src.monkey_brain.api.main import app
+            from src.monkey_brain.kernel.host_state import get_host_state
 
-            cr = getattr(getattr(app, "state", None), "cognitive_runtime", None)
+            cr = getattr(get_host_state(), "cognitive_runtime", None)
             return getattr(cr, "semantic_memory", None)
         except Exception:
             return None

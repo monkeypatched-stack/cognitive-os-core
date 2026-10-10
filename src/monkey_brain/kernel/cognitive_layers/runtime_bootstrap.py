@@ -41,7 +41,7 @@ class RuntimeBootstrap:
         graph_manager: Any = None,
     ) -> None:
         """Attach Kernel-injected dependencies to the runtime."""
-        from src.monkey_brain.api import bootstrap as boot_mod
+        from src.monkey_brain.kernel import bootstrap as boot_mod
 
         rt._event_bus = event_bus
         rt.lemon = lemon
@@ -107,7 +107,7 @@ class RuntimeBootstrap:
                     exc,
                 )
 
-        from src.monkey_brain.api import bootstrap as boot_mod
+        from src.monkey_brain.kernel import bootstrap as boot_mod
 
         await boot_mod.shutdown(app, rt.persistence, rt.lemon, rt.pcp, rt.graph_store, self._semantic_graph)
 

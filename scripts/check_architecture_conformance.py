@@ -328,25 +328,39 @@ def _boundary_violations() -> dict[str, list[str]]:
     return violations
 
 
-def _actor_imports_control_plane() -> list[str]:
-    """Control plane / actor separation (src/monkey_brain/actor_contract).
+# The control plane's own code: the HTTP API package and the route modules
+# that mount on it. Everything else under src/, plus services/common, is
+# core -- shared by the control plane and every Actor Runtime.
+CONTROL_PLANE_ROUTE_MODULES = (
+    SRC / "dashboard" / "routes.py",
+    SRC / "oql" / "routes.py",
+    SRC / "routing" / "routes.py",
+)
+CONTROL_PLANE_MODULE_PREFIXES = ("src.monkey_brain.api", "services.agentos", "services.auth")
 
-    The Actor Runtime process, the contract it shares with the control
-    plane, and the shared idempotency store must not import the control-
-    plane API package (src.monkey_brain.api) at ANY level — function-scoped
-    lazy imports included, since those are exactly how /execute used to
-    drag the whole control-plane router into every actor pod at runtime.
+
+def _core_imports_control_plane() -> list[str]:
+    """Core / control plane separation (src/monkey_brain/actor_contract,
+    kernel/host_state.py).
+
+    Core code must not import the control plane at ANY level --
+    function-scoped lazy imports included, since those are exactly how the
+    actor's /execute dragged the whole control-plane router into every
+    actor pod, and how kernel code importing api.main built the entire
+    control-plane app inside actor processes. Keeping this true is what
+    lets core, control plane and actor live in separate repos.
     """
-    files = [
-        SRC / "actor_runtime.py",
-        SRC / "kernel" / "idempotency_store.py",
-        *sorted((SRC / "actor_contract").glob("*.py")),
-    ]
+    files = [*sorted((ROOT / "src").rglob("*.py")),
+             *sorted((ROOT / "domains/manufacturing/knowledge/services/common").rglob("*.py"))]
+    api_dir = SRC / "api"
     violations: list[str] = []
     for path in files:
-        if not path.exists():
+        if path.is_relative_to(api_dir) or path in CONTROL_PLANE_ROUTE_MODULES or path.name.startswith("test_"):
             continue
-        tree = ast.parse(path.read_text(errors="ignore"))
+        try:
+            tree = ast.parse(path.read_text(errors="ignore"))
+        except SyntaxError:
+            continue
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
                 mods = [a.name for a in node.names]
@@ -355,7 +369,7 @@ def _actor_imports_control_plane() -> list[str]:
             else:
                 continue
             for mod in mods:
-                if mod == "src.monkey_brain.api" or mod.startswith("src.monkey_brain.api."):
+                if any(mod == p or mod.startswith(p + ".") for p in CONTROL_PLANE_MODULE_PREFIXES):
                     violations.append(f"{path.relative_to(ROOT)}:{node.lineno}: import {mod}")
     return violations
 
@@ -638,7 +652,7 @@ def collect() -> dict:
     hard["boundary_capability_runtime_bypass"] = not boundary["ActionExecutor"]
     hard["boundary_society_no_direct_cognitive_os"] = not boundary["society_no_direct_cognitive_os"]
     hard["boundary_no_module_level_cognitive_imports"] = not boundary["no_module_level_cognitive_imports"]
-    hard["actor_imports_control_plane"] = not _actor_imports_control_plane()
+    hard["core_imports_control_plane"] = not _core_imports_control_plane()
     hard["untrusted_security_authority_assignments"] = not _untrusted_security_authority_violations()
     hard["governed_commitment_on_action_executor"] = "ensure_governed" in (
         SRC / "kernel" / "pipeline" / "action_executor.py"

@@ -14,5 +14,6 @@ Both sides import from here; neither imports the other. In particular the
 Actor Runtime must never import ``src.monkey_brain.api`` — that package is
 the control plane (its router, OPA wiring, gateway models) and drags the
 whole control plane into every actor process. Enforced by
-scripts/check_architecture_conformance.py (``actor_imports_control_plane``).
+scripts/check_architecture_conformance.py (``core_imports_control_plane``),
+which holds every core module to the same rule.
 """
