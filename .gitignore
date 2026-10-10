@@ -66,3 +66,6 @@ secrets.yml
 coverage.xml
 htmlcov/
 *.log
+
+# scripts/stack.sh runtime state (pids, logs, generated admin login)
+.stack/

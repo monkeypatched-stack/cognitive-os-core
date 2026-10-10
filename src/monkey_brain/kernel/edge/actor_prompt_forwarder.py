@@ -45,9 +45,10 @@ class ActorPromptForwardError(RuntimeError):
 async def forward_prompt_to_actor_pod(
     actor_id: str, question: str, *, timeout: float = DEFAULT_TIMEOUT_SEC
 ) -> dict[str, Any]:
-    """POST {"question": question} to http://cognitiveos-actor-{actor_id}:
-    8051/prompt with the X-Internal-Service-Token header actor_runtime.py's
-    own require_internal_service_token() checks. Raises
+    """POST {"question": question} to the actor's own /prompt (address from
+    kernel/edge/actor_pod_client.py::actor_pod_base_url) with the
+    X-Internal-Service-Token header actor_runtime.py's own
+    require_internal_service_token() checks. Raises
     ActorPromptForwardError on any failure -- callers that want a
     best-effort "try this, fall back to something else" shape (like
     api/routes/prompt.py's own proactive/reactive forward) catch this
@@ -56,20 +57,12 @@ async def forward_prompt_to_actor_pod(
     if not token:
         raise ActorPromptForwardError("INTERNAL_SERVICE_TOKEN not set — cannot forward to actor Pod")
 
-    import httpx
+    from src.monkey_brain.kernel.edge.actor_pod_client import (
+        ActorPodRequestError,
+        actor_pod_request,
+    )
 
-    url = f"http://cognitiveos-actor-{actor_id}:8051/prompt"
     try:
-        async with httpx.AsyncClient(timeout=timeout) as client:
-            resp = await client.post(
-                url,
-                headers={
-                    "X-Internal-Service-Token": token,
-                    "Content-Type": "application/json",
-                },
-                json={"question": question},
-            )
-        resp.raise_for_status()
-        return resp.json()
-    except Exception as exc:
-        raise ActorPromptForwardError(f"forwarding to {url} failed: {exc}") from exc
+        return await actor_pod_request(actor_id, "POST", "/prompt", json={"question": question}, timeout=timeout)
+    except ActorPodRequestError as exc:
+        raise ActorPromptForwardError(f"forwarding to actor {actor_id} failed: {exc}") from exc

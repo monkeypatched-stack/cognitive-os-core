@@ -24,6 +24,7 @@ from src.monkey_brain.kernel.society.actor_state_rehydrator import (
     ActorStateRehydrator,
     RehydrationResult,
 )
+from src.monkey_brain.kernel.society.domain import ActorType
 
 # ── Fixtures ─────────────────────────────────────────────────────────
 
@@ -148,7 +149,7 @@ def test_rehydrate_from_mongodb_single_actor(mock_planetary_runtime):
         "actor_id": "actor-1",
         "tenant_id": "tenant-1",
         "name": "TestActor",
-        "actor_type": "Agent",
+        "actor_type": "ai_agent",
         "society_id": "test-society",
         "status": "registered",
         "belief_state": json.dumps({"version": 1}),
@@ -177,7 +178,7 @@ def test_rehydrate_from_mongodb_multiple_actors(mock_planetary_runtime):
             "actor_id": f"actor-{i}",
             "tenant_id": "tenant-1",
             "name": f"Actor{i}",
-            "actor_type": "Agent",
+            "actor_type": "ai_agent",
             "society_id": "test-society",
             "status": "registered",
         }
@@ -215,13 +216,13 @@ def test_rehydrate_skips_existing_actors(mock_planetary_runtime):
             "_id": "tenant-1:actor-1",
             "actor_id": "actor-1",
             "name": "Actor1",
-            "actor_type": "Agent",
+            "actor_type": "ai_agent",
         },
         "tenant-1:actor-2": {
             "_id": "tenant-1:actor-2",
             "actor_id": "actor-2",
             "name": "Actor2",
-            "actor_type": "Agent",
+            "actor_type": "ai_agent",
         },
     }
     mock_store._db.get_db.return_value[mock_store._collection_name]._docs = actors
@@ -304,7 +305,7 @@ def test_rehydrate_restores_desired_state(mock_planetary_runtime):
         "_id": "tenant-1:actor-1",
         "actor_id": "actor-1",
         "name": "TestActor",
-        "actor_type": "Agent",
+        "actor_type": "ai_agent",
         "society_id": "test-society",
         "desired_state": {
             "state": "PAUSED",
@@ -331,7 +332,7 @@ def test_rehydrate_restores_belief_state(mock_planetary_runtime):
         "_id": "tenant-1:actor-1",
         "actor_id": "actor-1",
         "name": "TestActor",
-        "actor_type": "Agent",
+        "actor_type": "ai_agent",
         "society_id": "test-society",
         "belief_state": json.dumps(belief_data),
     }
@@ -352,7 +353,7 @@ def test_rehydrate_restores_lifecycle_status(mock_planetary_runtime):
         "_id": "tenant-1:actor-1",
         "actor_id": "actor-1",
         "name": "TestActor",
-        "actor_type": "Agent",
+        "actor_type": "ai_agent",
         "society_id": "test-society",
         "status": "ACTIVE",
     }
@@ -377,7 +378,7 @@ def test_rehydrate_idempotent_same_input(mock_planetary_runtime):
         "_id": "tenant-1:actor-1",
         "actor_id": "actor-1",
         "name": "TestActor",
-        "actor_type": "Agent",
+        "actor_type": "ai_agent",
     }
     mock_store._db.get_db.return_value[mock_store._collection_name]._docs = {"tenant-1:actor-1": actor_doc}
 
@@ -407,7 +408,7 @@ def test_construct_actor_profile_basic(mock_planetary_runtime):
     actor_doc = {
         "actor_id": "actor-1",
         "name": "TestActor",
-        "actor_type": "Agent",
+        "actor_type": "ai_agent",
     }
 
     rehydrator = ActorStateRehydrator(runtime)
@@ -416,7 +417,7 @@ def test_construct_actor_profile_basic(mock_planetary_runtime):
     assert profile is not None
     assert profile.identity.actor_id == "actor-1"
     assert profile.identity.name == "TestActor"
-    assert profile.identity.actor_type == "Agent"
+    assert profile.identity.actor_type == ActorType.AI_AGENT
 
 
 def test_construct_actor_profile_with_metadata(mock_planetary_runtime):
@@ -426,7 +427,7 @@ def test_construct_actor_profile_with_metadata(mock_planetary_runtime):
     actor_doc = {
         "actor_id": "actor-1",
         "name": "TestActor",
-        "actor_type": "Agent",
+        "actor_type": "ai_agent",
         "goals": ["goal1", "goal2"],
         "policies": ["policy1"],
         "trust_level": 0.8,
@@ -443,11 +444,11 @@ def test_construct_actor_profile_with_metadata(mock_planetary_runtime):
 
 
 def test_construct_actor_profile_missing_fields(mock_planetary_runtime):
-    """Test that construction handles missing fields gracefully."""
+    """Optional fields default; name defaults to actor_id."""
     runtime, mock_store = mock_planetary_runtime
 
-    # Minimal document
-    actor_doc = {"actor_id": "actor-1"}
+    # Minimal document (actor_type is always persisted by ActorIdentity.to_dict)
+    actor_doc = {"actor_id": "actor-1", "actor_type": "robot"}
 
     rehydrator = ActorStateRehydrator(runtime)
     profile = rehydrator._construct_actor_profile_from_mongodb("actor-1", actor_doc)
@@ -455,7 +456,18 @@ def test_construct_actor_profile_missing_fields(mock_planetary_runtime):
     assert profile is not None
     assert profile.identity.actor_id == "actor-1"
     assert profile.identity.name == "actor-1"  # Defaults to actor_id
-    assert profile.identity.actor_type == "unknown"
+    assert profile.identity.actor_type == ActorType.ROBOT
+    assert profile.goals == ()
+
+
+def test_construct_actor_profile_invalid_type_skipped(mock_planetary_runtime):
+    """A missing or unknown actor_type is skipped, same as _load_actors --
+    passing the raw string through used to fail later on `.value`."""
+    runtime, mock_store = mock_planetary_runtime
+    rehydrator = ActorStateRehydrator(runtime)
+
+    assert rehydrator._construct_actor_profile_from_mongodb("actor-1", {"actor_id": "actor-1"}) is None
+    assert rehydrator._construct_actor_profile_from_mongodb("actor-1", {"actor_type": "Agent"}) is None
 
 
 # ── Integration Tests ────────────────────────────────────────────────
@@ -480,7 +492,7 @@ def test_rehydration_end_to_end_restart_scenario(mock_planetary_runtime):
         "_id": "tenant-1:alice",
         "actor_id": "alice",
         "name": "Alice",
-        "actor_type": "researcher",
+        "actor_type": "ai_agent",
         "society_id": "test-society",
         "status": "active",
         "belief_state": json.dumps({"confidence": 0.8, "knowledge": "extensive"}),
@@ -536,14 +548,14 @@ def test_rehydration_multi_society(mock_planetary_runtime):
             "_id": "tenant-1:actor-1",
             "actor_id": "actor-1",
             "name": "Actor1",
-            "actor_type": "Agent",
+            "actor_type": "ai_agent",
             "society_id": "society-1",
         },
         "tenant-1:actor-2": {
             "_id": "tenant-1:actor-2",
             "actor_id": "actor-2",
             "name": "Actor2",
-            "actor_type": "Agent",
+            "actor_type": "ai_agent",
             "society_id": "society-2",
         },
     }

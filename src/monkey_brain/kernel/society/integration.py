@@ -705,6 +705,12 @@ class PlanetaryRuntime:
             self._societies[self._society_runtime.society.society_id] = self._society_runtime
             self._save_societies()
 
+        # Rehydrate actors from MongoDB now that societies exist (and before
+        # _load_actors below). Previously ran inside _init_persistence(),
+        # before self._societies was assigned, so every boot failed with
+        # "'PlanetaryRuntime' object has no attribute '_societies'".
+        self._rehydrate_actors_from_mongodb()
+
         # Optional connectivity validation used by the offline safety gate.
         # Edge-First Architecture: defaults to ENABLED for edge/device/robot
         # node classes (an ACTOR_NODE_CLASS actor_runtime.py always sets
@@ -903,6 +909,42 @@ class PlanetaryRuntime:
         # Initialize persistence for collective learning state.
         self._init_collective_learning_persistence()
 
+    def _rehydrate_actors_from_mongodb(self) -> None:
+        """Restore persisted actors into their societies. Non-blocking: errors
+        are logged but never block startup. A no-op when _init_persistence()
+        never got far enough to construct the rehydrator (Redis unavailable)."""
+        rehydrator = getattr(self, "_actor_state_rehydrator", None)
+        if rehydrator is None:
+            return
+        try:
+            rehydration_result = rehydrator.rehydrate_from_mongodb()
+            if rehydration_result.success:
+                logger.info(
+                    "Actor state rehydration complete: %s",
+                    rehydration_result.summary(),
+                )
+
+                # Enforce desired state for rehydrated actors immediately
+                # This ensures actors don't unexpectedly become active if
+                # they were previously PAUSED/SUSPENDED/TERMINATED.
+                try:
+                    lifecycle = self.lifecycle
+                    lifecycle_results = lifecycle.reconcile_rehydrated_actors()
+                    logger.info(
+                        "Rehydrated actor lifecycle reconciliation: %d total, %d enforced desired state",
+                        len(lifecycle_results),
+                        sum(1 for r in lifecycle_results if r.action != "none"),
+                    )
+                except Exception as exc:
+                    logger.warning("Rehydrated actor lifecycle reconciliation failed: %s", exc)
+            else:
+                logger.warning(
+                    "Actor state rehydration failed: %d errors",
+                    len(rehydration_result.errors),
+                )
+        except Exception as exc:
+            logger.warning("Actor state rehydration failed: %s", exc)
+
     def _init_persistence(self) -> None:
         """Initialize Redis client for world/actor/society persistence."""
         try:
@@ -957,37 +999,10 @@ class PlanetaryRuntime:
                 ActorStateRehydrator,
             )
 
+            # Rehydration itself runs later, from __init__ via
+            # _rehydrate_actors_from_mongodb() -- it needs self._societies and
+            # self._society_runtime, which don't exist yet at this point.
             self._actor_state_rehydrator = ActorStateRehydrator(self)
-            # Rehydrate actors from MongoDB (must happen before _load_actors)
-            # Non-blocking; errors are logged but don't block startup
-            try:
-                rehydration_result = self._actor_state_rehydrator.rehydrate_from_mongodb()
-                if rehydration_result.success:
-                    logger.info(
-                        "Actor state rehydration complete: %s",
-                        rehydration_result.summary(),
-                    )
-
-                    # Enforce desired state for rehydrated actors immediately
-                    # This ensures actors don't unexpectedly become active if
-                    # they were previously PAUSED/SUSPENDED/TERMINATED.
-                    try:
-                        lifecycle = self.lifecycle
-                        lifecycle_results = lifecycle.reconcile_rehydrated_actors()
-                        logger.info(
-                            "Rehydrated actor lifecycle reconciliation: %d total, %d enforced desired state",
-                            len(lifecycle_results),
-                            sum(1 for r in lifecycle_results if r.action != "none"),
-                        )
-                    except Exception as exc:
-                        logger.warning("Rehydrated actor lifecycle reconciliation failed: %s", exc)
-                else:
-                    logger.warning(
-                        "Actor state rehydration failed: %d errors",
-                        len(rehydration_result.errors),
-                    )
-            except Exception as exc:
-                logger.warning("Actor state rehydration failed: %s", exc)
 
             try:
                 rebuild = self.rebuild_redis_index_from_mongodb()
@@ -1344,6 +1359,30 @@ class PlanetaryRuntime:
             scope_actor_id = os.getenv("ACTOR_ID", "").strip()
             if scope_actor_id:
                 actors = [a for a in actors if a.get("identity", {}).get("actor_id") == scope_actor_id]
+            else:
+                # The same gap from the other side: a multi-actor process
+                # (control plane) must not load an actor whose desired node
+                # is its own dedicated Actor Runtime. Loading it registered
+                # a local copy that stamped THIS node_id into the actor's
+                # registry entry -- whichever process booted last "owned"
+                # the actor, and when the control plane won, the dedicated
+                # runtime saw resident_here=False and refused every prompt
+                # ("was not reached by its effective societies").
+                from src.monkey_brain.kernel.edge.actor_pod_client import is_dedicated_node
+
+                def _placed_elsewhere(actor_data: dict) -> bool:
+                    actor_id = actor_data.get("identity", {}).get("actor_id", "")
+                    desired = self.get_actor_desired_node(actor_id) if actor_id else ""
+                    return is_dedicated_node(actor_id, desired) and desired != self._node_id
+
+                dedicated = [a for a in actors if _placed_elsewhere(a)]
+                if dedicated:
+                    logger.info(
+                        "Not loading %d actor(s) placed on their own Actor Runtime: %s",
+                        len(dedicated),
+                        ", ".join(a.get("identity", {}).get("actor_id", "?") for a in dedicated),
+                    )
+                    actors = [a for a in actors if not _placed_elsewhere(a)]
             if actors:
                 loaded = 0
                 skipped = 0

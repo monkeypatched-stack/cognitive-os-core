@@ -769,6 +769,16 @@ class LLMPlanner:
                 this_call_ms = (time.perf_counter() - llm_call_started) * 1000
                 llm_call_ms += this_call_ms
                 llm_call_count += 1
+            # Pairs with the prompt logged above: without the response there
+            # was no way to tell a model that dropped a step's parameters
+            # from one the parser or executor mishandled.
+            logger.info(
+                "[llm_planner] response for goal=%r (attempt %d%s):\n%s",
+                resolved_goal.name,
+                attempt + 1,
+                ", cached" if cached_raw is not None else "",
+                raw,
+            )
             parse_started = time.perf_counter()
             try:
                 parsed = self._parse(raw)

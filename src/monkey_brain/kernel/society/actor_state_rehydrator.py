@@ -377,10 +377,19 @@ class ActorStateRehydrator:
             from src.monkey_brain.kernel.society.domain import (
                 ActorProfile,
                 ActorIdentity,
+                ActorType,
             )
 
-            # Extract core identity from MongoDB
-            actor_type = actor_doc.get("actor_type", "unknown")
+            # Extract core identity from MongoDB. ActorIdentity needs the
+            # enum, not the persisted string -- a raw str here failed later
+            # with "'str' object has no attribute 'value'". Unknown types are
+            # skipped, same as PlanetaryRuntime._load_actors does.
+            raw_type = actor_doc.get("actor_type", "")
+            try:
+                actor_type = raw_type if isinstance(raw_type, ActorType) else ActorType(raw_type)
+            except ValueError:
+                logger.warning("Skipping rehydration of %s: invalid actor_type %r", actor_id, raw_type)
+                return None
             name = actor_doc.get("name", actor_id)
 
             # Construct actor identity
