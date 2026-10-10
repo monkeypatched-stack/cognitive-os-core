@@ -328,6 +328,38 @@ def _boundary_violations() -> dict[str, list[str]]:
     return violations
 
 
+def _actor_imports_control_plane() -> list[str]:
+    """Control plane / actor separation (src/monkey_brain/actor_contract).
+
+    The Actor Runtime process, the contract it shares with the control
+    plane, and the shared idempotency store must not import the control-
+    plane API package (src.monkey_brain.api) at ANY level — function-scoped
+    lazy imports included, since those are exactly how /execute used to
+    drag the whole control-plane router into every actor pod at runtime.
+    """
+    files = [
+        SRC / "actor_runtime.py",
+        SRC / "kernel" / "idempotency_store.py",
+        *sorted((SRC / "actor_contract").glob("*.py")),
+    ]
+    violations: list[str] = []
+    for path in files:
+        if not path.exists():
+            continue
+        tree = ast.parse(path.read_text(errors="ignore"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                mods = [a.name for a in node.names]
+            elif isinstance(node, ast.ImportFrom):
+                mods = [node.module or ""]
+            else:
+                continue
+            for mod in mods:
+                if mod == "src.monkey_brain.api" or mod.startswith("src.monkey_brain.api."):
+                    violations.append(f"{path.relative_to(ROOT)}:{node.lineno}: import {mod}")
+    return violations
+
+
 def _capability_bus_implementations() -> list[str]:
     """Find CapabilityBus classes that are neither the canonical bus, a
     Protocol interface, nor a documented registry-attached/scoped adapter.
@@ -606,6 +638,7 @@ def collect() -> dict:
     hard["boundary_capability_runtime_bypass"] = not boundary["ActionExecutor"]
     hard["boundary_society_no_direct_cognitive_os"] = not boundary["society_no_direct_cognitive_os"]
     hard["boundary_no_module_level_cognitive_imports"] = not boundary["no_module_level_cognitive_imports"]
+    hard["actor_imports_control_plane"] = not _actor_imports_control_plane()
     hard["untrusted_security_authority_assignments"] = not _untrusted_security_authority_violations()
     hard["governed_commitment_on_action_executor"] = "ensure_governed" in (
         SRC / "kernel" / "pipeline" / "action_executor.py"

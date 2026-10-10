@@ -6,7 +6,7 @@ import pytest
 from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 
-from src.monkey_brain.api.internal_auth import require_internal_service_token
+from src.monkey_brain.actor_contract.internal_auth import require_internal_service_token
 
 
 @pytest.fixture()
