@@ -774,7 +774,19 @@ class ActorLifecycleController:
         or the last real request checkpoint — stale by however long ago
         that was, not "as of the transition that just happened." Never
         raises; a registry-refresh failure must not undo the lifecycle
-        transition that already succeeded."""
+        transition that already succeeded.
+
+        Also checkpoints to the durable actor-state store: locate_actor()
+        reads Mongo FIRST and re-caches that row into Redis, and Mongo's
+        status is only written by checkpoint_actor_belief(). Refreshing
+        Redis alone let a Mongo row checkpointed mid-transition (e.g.
+        "registered", written by the migration suspend on a cloud-class
+        actor's first boot) overwrite the newer "active" on the very next
+        observe_actor(), so the actor never reported READY."""
+        try:
+            self._planetary.checkpoint_actor_belief(actor_id)
+        except Exception:
+            logger.debug("_refresh_registry(%r) checkpoint failed (non-fatal)", actor_id, exc_info=True)
         try:
             sr = self._planetary._home_society_runtime(actor_id)
             state = sr.get_actor(actor_id) if sr is not None else None
