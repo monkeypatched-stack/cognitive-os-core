@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -9,6 +10,7 @@ try:
 except ImportError:  # pragma: no cover - requirements include PyYAML in normal installs
     yaml = None
 
+logger = logging.getLogger(__name__)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ONTOLOGY_REGISTRY_PATH = REPO_ROOT / "config" / "ontology" / "graph_ontology.v1.yaml"
@@ -36,7 +38,18 @@ def load_ontology_registry() -> dict[str, Any]:
 
 @lru_cache(maxsize=1)
 def ontology_collection_map() -> dict[str, dict[str, Any]]:
-    registry = load_ontology_registry()
+    # The Neo4j mirror calls this for every write. Without the registry
+    # file every write used to fail with a FileNotFoundError traceback;
+    # an empty map instead just means no ontology-derived relationships
+    # (the mirror's built-in ones are unaffected). Cached, so this warns once.
+    try:
+        registry = load_ontology_registry()
+    except FileNotFoundError:
+        logger.warning(
+            "Ontology registry %s not found -- mirroring without ontology relationships",
+            ONTOLOGY_REGISTRY_PATH,
+        )
+        registry = {}
     mapped: dict[str, dict[str, Any]] = {}
     for entity_name, entity in (registry.get("entity_types") or {}).items():
         for collection in entity.get("collections") or []:
