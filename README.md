@@ -12,9 +12,9 @@ Code/
 ├── cognitive-os-core/                    ← this repo: kernel, society, contracts
 ├── cognitive-os-control-plane/           Control API, scheduler, auth, gateway (Kong)
 ├── cognitive-os-actor/                   the Actor Runtime (domain-free)
-├── cognitive-os-domains/                 domains, devices, domain API service
+├── cognitive-os-domains/                 domains, devices, domain API, manufacturing microservices
 ├── cognitive-os-ui/                      workspace UI and Living World Explorer
-└── coginitive-os-manufacturing/          manufacturing domain microservices
+└── cognitive-os-scripts/                 deployment and operations scripts
 ```
 
 The Python repos depend on this one. Locally they find it as the sibling

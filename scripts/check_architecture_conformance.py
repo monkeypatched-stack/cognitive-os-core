@@ -369,9 +369,10 @@ def _core_imports_control_plane() -> list[str]:
     return violations
 
 
-# Domain and actor-only code lives in the actor repo (domains, devices, the
-# Actor Runtime) or the manufacturing-services repo; the core must never
-# import it -- domains plug in through kernel/extensions.py instead.
+# Domain and actor-only code lives in cognitive-os-domains (domains, devices,
+# the domain API, the manufacturing microservices) and cognitive-os-actor
+# (the Actor Runtime); the core must never import it -- domains plug in
+# through kernel/extensions.py instead.
 DOMAIN_MODULE_PREFIXES = (
     "src.monkey_brain.domains",
     "src.monkey_brain.devices",

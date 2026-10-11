@@ -4,7 +4,7 @@ and creating its proposed-change nodes.
 
 Shared by the auth service's /compliance/change-controls route
 (cognitive-os-control-plane) and the PM service's SOP change controls
-(coginitive-os-manufacturing), which used to import these from the
+(cognitive-os-domains), which used to import these from the
 auth router directly. Moved verbatim from services/auth/routers/auth.py.
 """
 
