@@ -35,10 +35,6 @@ from .execute.agent_mesh import ExecutionPool, AgentSpec, AgentRole
 from cortex.reasoning_scheduler import ReasoningScheduler
 from .loss_decomposer import LossDecomposer
 from .loss_driven_repair import LossDrivenRepair
-from domains.software_engineering.knowledge.telemetry import EngineeringReport
-from domains.software_engineering.knowledge.pack import (
-    SoftwareEngineeringKnowledgePublisher,
-)
 from .capability_interface import ICapability, CapabilityResult
 from .execute.capabilities.bus import CapabilityBus
 from .config import (
@@ -111,8 +107,16 @@ class CognitiveKernel:
         self.reasoning_scheduler = ReasoningScheduler()
         self.loss_decomposer = LossDecomposer()
         self.repair_engine = LossDrivenRepair()
-        self.telemetry = EngineeringReport()
-        self.knowledge_publisher = SoftwareEngineeringKnowledgePublisher()
+        # Engineering telemetry / knowledge publishing come from a domain
+        # plugin (kernel/extensions.py; the software-engineering pack in the
+        # actor repo). Without one, the kernel runs and simply skips them.
+        from .extensions import extensions, load_domain_plugins
+
+        load_domain_plugins()
+        self.telemetry = extensions.kernel_report_factory() if extensions.kernel_report_factory else None
+        self.knowledge_publisher = (
+            extensions.knowledge_publisher_factory() if extensions.knowledge_publisher_factory else None
+        )
 
         # History
         self._history: list[dict[str, Any]] = []
@@ -258,6 +262,8 @@ class CognitiveKernel:
 
         # 8c. Publish engineering knowledge after successful step
         try:
+            if self.knowledge_publisher is None:
+                raise LookupError("no knowledge publisher registered")
             self.knowledge_publisher.publish(
                 spec_id=f"step-{self._step}",
                 goal=self._goal.objective,
@@ -332,8 +338,9 @@ class CognitiveKernel:
         self._step += 1
 
         # Update telemetry
-        self.telemetry.simulation.prediction_loss = loss_dict.get("L_E", 0.0)
-        self.telemetry.simulation.rounds = self._step
+        if self.telemetry is not None:
+            self.telemetry.simulation.prediction_loss = loss_dict.get("L_E", 0.0)
+            self.telemetry.simulation.rounds = self._step
 
         elapsed = (time.monotonic() - t0) * 1000
         step_result: dict[str, Any] = {
@@ -435,11 +442,13 @@ class CognitiveKernel:
             "mesh": self.execution_pool.get_mesh_state(),
             "broca_mesh": self.state.M,
             "planner_policy": self._planner_policy.summary(),
-            "telemetry": self.telemetry.to_dict(),
+            "telemetry": self.telemetry.to_dict() if self.telemetry is not None else {},
         }
 
     def get_report(self) -> str:
-        """Get engineering telemetry report."""
+        """Get engineering telemetry report ("" when no domain provides one)."""
+        if self.telemetry is None:
+            return ""
         self.telemetry.knowledge.knowledge_packs = len(self.state.B.knowledge)
         self.telemetry.knowledge.confidence = self.state.B.confidence
         self.telemetry.architecture.ddd_score = 100

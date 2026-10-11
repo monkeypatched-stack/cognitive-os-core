@@ -1,27 +1,25 @@
+"""Intent registry: definitions and routes the UNDERSTAND phase resolves
+questions to.
+
+The core holds the mechanism and the platform intents (self-healing,
+codegen, SittingFace workloads, specification discovery, and the
+world-graph fallback). Domain intents -- work orders, batches, SOPs,
+approvals, ... -- live in the actor repo and register here from their
+domain plugin (kernel/extensions.py) through register_intent_definition(),
+register_intent_route() and register_intent_metadata().
+
+Routing order (INTENT_REGISTRY iteration order) is fixed: the platform
+head intents first (self_healing_pipeline must be first -- the healing
+sentinel takes priority; codegen before any domain intent), then domain
+routes in registration order, then the platform tail, with
+world_graph_traversal (matches anything) always LAST, then any routes
+added at runtime (soma charts, auto-registered domain queries).
+"""
+
 from fastapi import logger
 from src.monkey_brain.kernel.plan.intents.predicates.codegen import (
     codegen_question_answer,
     is_codegen_question,
-)
-from src.monkey_brain.kernel.plan.intents.predicates.drug_research import (
-    drug_research_question_answer,
-    is_drug_research_question,
-)
-from src.monkey_brain.kernel.plan.intents.predicates.batch_record import (
-    batch_record_question_answer,
-    is_batch_record_question,
-)
-from src.monkey_brain.kernel.plan.intents.predicates.batch_creation import (
-    batch_creation_question_answer,
-    is_batch_creation_question,
-)
-from src.monkey_brain.kernel.plan.intents.predicates.batch_update import (
-    batch_update_question_answer,
-    is_batch_update_question,
-)
-from src.monkey_brain.kernel.plan.intents.predicates.batch_delete import (
-    batch_delete_question_answer,
-    is_batch_delete_question,
 )
 from src.monkey_brain.kernel.plan.intents.predicates.sittingface_pipeline import (
     sittingface_pipeline_question_answer,
@@ -35,99 +33,6 @@ from src.monkey_brain.kernel.plan.intents.predicates.self_healing_pipeline impor
     self_healing_pipeline_question_answer,
     is_self_healing_question,
 )
-from src.monkey_brain.kernel.plan.intents.predicates.batch_hold import (
-    batch_hold_question_answer,
-    is_batch_hold_question,
-)
-from src.monkey_brain.kernel.plan.intents.predicates.batch_close import (
-    batch_close_question_answer,
-    is_batch_close_question,
-)
-from src.monkey_brain.kernel.plan.intents.predicates.work_order_create import (
-    work_order_create_question_answer,
-    is_work_order_create_question,
-)
-from src.monkey_brain.kernel.plan.intents.predicates.work_order_query import (
-    work_order_query_question_answer,
-    is_work_order_query_question,
-)
-from src.monkey_brain.kernel.plan.intents.predicates.work_order_update import (
-    work_order_update_question_answer,
-    is_work_order_update_question,
-)
-from src.monkey_brain.kernel.plan.intents.predicates.work_order_delete import (
-    work_order_delete_question_answer,
-    is_work_order_delete_question,
-)
-from src.monkey_brain.kernel.plan.intents.predicates.work_order_hold import (
-    work_order_hold_question_answer,
-    is_work_order_hold_question,
-)
-from src.monkey_brain.kernel.plan.intents.predicates.work_order_status import (
-    work_order_status_question_answer,
-    is_work_order_status_question,
-)
-from src.monkey_brain.kernel.plan.intents.predicates.approval_create import (
-    approval_create_question_answer,
-    is_approval_create_question,
-)
-from src.monkey_brain.kernel.plan.intents.predicates.approval_query import (
-    approval_query_question_answer,
-    is_approval_query_question,
-)
-from src.monkey_brain.kernel.plan.intents.predicates.approval_decision import (
-    approval_decision_question_answer,
-    is_approval_decision_question,
-)
-from src.monkey_brain.kernel.plan.intents.predicates.approval_hold import (
-    approval_hold_question_answer,
-    is_approval_hold_question,
-)
-from src.monkey_brain.kernel.plan.intents.predicates.change_control import (
-    change_control_question_answer,
-    is_change_control_question,
-    is_change_control_create_question,
-    is_change_control_query_question,
-    is_change_control_update_question,
-    is_change_control_decision_question,
-)
-from src.monkey_brain.kernel.plan.intents.predicates.compliance_audit import (
-    is_compliance_audit_question,
-    compliance_audit_approval_question_answer,
-)
-from src.monkey_brain.kernel.plan.intents.predicates.decision_intelligence import (
-    decision_intelligence_question_answer,
-    is_decision_intelligence_question,
-)
-from src.monkey_brain.kernel.plan.intents.predicates.production_kpi import (
-    production_kpi_question_answer,
-    is_production_kpi_question,
-)
-from src.monkey_brain.kernel.plan.intents.predicates.warehouse_shipping import (
-    warehouse_shipping_question_answer,
-    is_warehouse_shipping_question,
-)
-from src.monkey_brain.kernel.plan.intents.predicates.worker import (
-    worker_question_answer,
-    is_worker_question,
-)
-from src.monkey_brain.kernel.plan.intents.predicates.sop_query import (
-    sop_query_question_answer,
-    is_sop_query_question,
-)
-from src.monkey_brain.kernel.plan.intents.predicates.facility_query import (
-    facility_query_question_answer,
-    is_facility_query,
-)
-from src.monkey_brain.kernel.plan.intents.predicates.plant_hierarchy import (
-    plant_hierarchy_question_answer,
-    is_plant_hierarchy,
-)
-
-# ------------------------------------------------------------------
-# Semantic Definition
-# ------------------------------------------------------------------
-
 from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable
 
@@ -154,316 +59,14 @@ class IntentDefinition:
     goal_type: str = "query"
 
 
-DRUG_RESEARCH_DEFINITION = IntentDefinition(
-    intent="drug_research",
-    required_inputs=["compound"],
-    required_outputs=["drug_research_result"],
-    min_confidence=0.50,
-)
-
-BATCH_RECORD_DEFINITION = IntentDefinition(
-    intent="batch_record",
-    required_inputs=["batch_id"],
-    required_outputs=["batch_record"],
-    default_augmentations=[
-        "approvals",
-        "deviations",
-        "lineage",
-    ],
-)
-
-BATCH_CREATION_DEFINITION = IntentDefinition(
-    intent="batch_creation_request",
-    required_inputs=["product", "size", "route"],
-    required_outputs=["workflow"],
-    default_augmentations=[
-        "sops",
-        "process_parameters",
-        "quality_controls",
-    ],
-    goal_type="create",
-)
-
-BATCH_UPDATE_DEFINITION = IntentDefinition(
-    intent="batch_update",
-    required_inputs=["batch_id"],
-    required_outputs=["update_workflow"],
-    default_augmentations=[
-        "change_control",
-        "quality_review",
-        "audit_trail",
-    ],
-    goal_type="update",
-)
-
-BATCH_DELETE_DEFINITION = IntentDefinition(
-    intent="batch_delete",
-    required_inputs=["batch_id"],
-    required_outputs=["deletion_workflow"],
-    default_augmentations=[
-        "disposition",
-        "regulatory_compliance",
-        "audit_trail",
-    ],
-    goal_type="delete",
-)
-
-BATCH_HOLD_DEFINITION = IntentDefinition(
-    intent="batch_hold",
-    required_inputs=["batch_id"],
-    required_outputs=["hold_workflow"],
-    default_augmentations=[
-        "stabilization",
-        "notification",
-        "monitoring",
-    ],
-    goal_type="update",
-)
-
-BATCH_CLOSE_DEFINITION = IntentDefinition(
-    intent="batch_close",
-    required_inputs=["batch_id"],
-    required_outputs=["close_workflow"],
-    default_augmentations=[
-        "quality_review",
-        "yield_calculation",
-        "release_approval",
-    ],
-    goal_type="update",
-)
-
-WORK_ORDER_CREATE_DEFINITION = IntentDefinition(
-    intent="work_order_create",
-    required_inputs=["work_order_type", "description"],
-    required_outputs=["work_order"],
-    default_augmentations=[
-        "sops",
-        "resources",
-        "schedule",
-    ],
-    goal_type="create",
-)
-
-WORK_ORDER_QUERY_DEFINITION = IntentDefinition(
-    intent="work_order_query",
-    required_inputs=["work_order_id"],
-    required_outputs=["work_order_details"],
-    default_augmentations=[
-        "status_history",
-        "time_tracking",
-    ],
-)
-
-WORK_ORDER_UPDATE_DEFINITION = IntentDefinition(
-    intent="work_order_update",
-    required_inputs=["work_order_id"],
-    required_outputs=["work_order"],
-    default_augmentations=[
-        "change_control",
-        "notification",
-        "audit_trail",
-    ],
-    goal_type="update",
-)
-
-WORK_ORDER_DELETE_DEFINITION = IntentDefinition(
-    intent="work_order_delete",
-    required_inputs=["work_order_id"],
-    required_outputs=["deletion_status"],
-    default_augmentations=[
-        "impact_assessment",
-        "approval",
-        "audit_trail",
-    ],
-    goal_type="delete",
-)
-
-WORK_ORDER_STATUS_DEFINITION = IntentDefinition(
-    intent="work_order_status",
-    required_inputs=["work_order_id", "target_status"],
-    required_outputs=["work_order"],
-    default_augmentations=[
-        "state_machine",
-        "approval",
-        "notification",
-    ],
-    goal_type="update",
-)
-
-WORK_ORDER_HOLD_DEFINITION = IntentDefinition(
-    intent="work_order_hold",
-    required_inputs=["work_order_id"],
-    required_outputs=["work_order"],
-    default_augmentations=[
-        "justification",
-        "notification",
-        "monitoring",
-    ],
-    goal_type="update",
-)
-
-DECISION_INTELLIGENCE_DEFINITION = IntentDefinition(
-    intent="decision_intelligence",
-    required_inputs=["question"],
-    required_outputs=["decision_package"],
-    default_augmentations=[
-        "current_state",
-        "historical_outcomes",
-        "simulations",
-        "sops",
-        "policies",
-        "constraints",
-    ],
-    min_confidence=0.55,
-    goal_type="analyze",
-)
-
-APPROVAL_CREATE_DEFINITION = IntentDefinition(
-    intent="approval_create",
-    required_inputs=["approval_type"],
-    required_outputs=["approval"],
-    default_augmentations=[
-        "documentation",
-        "approver_routing",
-        "electronic_signature",
-    ],
-    goal_type="create",
-)
-
-APPROVAL_QUERY_DEFINITION = IntentDefinition(
-    intent="approval_query",
-    required_inputs=["approval_id"],
-    required_outputs=["approval_details"],
-    default_augmentations=[
-        "status_history",
-        "decision_history",
-    ],
-)
-
-APPROVAL_DECISION_DEFINITION = IntentDefinition(
-    intent="approval_decision",
-    required_inputs=["approval_id", "decision"],
-    required_outputs=["approval"],
-    default_augmentations=[
-        "review_checklist",
-        "electronic_signature",
-        "notification",
-    ],
-    goal_type="update",
-)
-
-APPROVAL_HOLD_DEFINITION = IntentDefinition(
-    intent="approval_hold",
-    required_inputs=["approval_id"],
-    required_outputs=["approval"],
-    default_augmentations=[
-        "justification",
-        "notification",
-        "monitoring",
-    ],
-    goal_type="update",
-)
-
-CHANGE_CONTROL_DEFINITION = IntentDefinition(
-    intent="change_control",
-    required_inputs=["change_type"],
-    required_outputs=["change_control"],
-    default_augmentations=[
-        "impact_assessment",
-        "risk_evaluation",
-        "approver_routing",
-    ],
-)
-
-CHANGE_CONTROL_CREATE_DEFINITION = IntentDefinition(
-    intent="change_control_create",
-    required_inputs=["change_type", "description"],
-    required_outputs=["change_control"],
-    default_augmentations=[
-        "impact_assessment",
-        "risk_evaluation",
-        "affected_entities",
-    ],
-    goal_type="create",
-)
-
-CHANGE_CONTROL_QUERY_DEFINITION = IntentDefinition(
-    intent="change_control_query",
-    required_inputs=["change_control_id"],
-    required_outputs=["change_control_details"],
-    default_augmentations=[
-        "status_history",
-        "approval_history",
-        "audit_trail",
-    ],
-)
-
-CHANGE_CONTROL_UPDATE_DEFINITION = IntentDefinition(
-    intent="change_control_update",
-    required_inputs=["change_control_id"],
-    required_outputs=["change_control"],
-    default_augmentations=[
-        "change_control",
-        "notification",
-        "audit_trail",
-    ],
-    goal_type="update",
-)
-
-CHANGE_CONTROL_DECISION_DEFINITION = IntentDefinition(
-    intent="change_control_decision",
-    required_inputs=["change_control_id", "decision"],
-    required_outputs=["change_control"],
-    default_augmentations=[
-        "review_checklist",
-        "electronic_signature",
-        "notification",
-    ],
-    goal_type="update",
-)
-
-PRODUCTION_KPI_DEFINITION = IntentDefinition(
-    intent="production_kpi",
-    required_inputs=[
-        "line",
-        "time_range",
-    ],
-    required_outputs=[
-        "kpi_report",
-    ],
-    goal_type="analyze",
-)
-
-WAREHOUSE_SHIPPING_DEFINITION = IntentDefinition(
-    intent="warehouse_shipping",
-    required_inputs=["shipment"],
-    required_outputs=["shipping_status"],
-    min_confidence=0.56,
-)
-
-WORKER_DEFINITION = IntentDefinition(
-    intent="worker",
-    required_inputs=["worker_id"],
-    required_outputs=["worker"],
-    default_augmentations=[
-        "training",
-        "certifications",
-    ],
-)
-
-APPROVAL_DEFINITION = IntentDefinition(
-    intent="approval",
-    required_inputs=["approval_id"],
-    required_outputs=["approval"],
-    min_confidence=0.52,
-)
-
 AUDIT_LOG_DEFINITION = IntentDefinition(
     intent="audit_log",
     required_inputs=["audit_id"],
     required_outputs=["audit_log"],
     min_confidence=0.52,
 )
+
+
 COUNT_DEFINITION = IntentDefinition(
     intent="count",
     required_inputs=["entity_type"],
@@ -471,33 +74,6 @@ COUNT_DEFINITION = IntentDefinition(
     min_confidence=0.50,
 )
 
-PLANT_TOPOLOGY_DEFINITION = IntentDefinition(
-    intent="plant_topology",
-    required_inputs=["entity_name"],
-    required_outputs=["topology_info"],
-    min_confidence=0.50,
-)
-
-ASSET_MANAGEMENT_DEFINITION = IntentDefinition(
-    intent="asset_management",
-    required_inputs=["asset_id"],
-    required_outputs=["asset_info"],
-    min_confidence=0.50,
-)
-
-SOP_COMPLIANCE_DEFINITION = IntentDefinition(
-    intent="sop_compliance",
-    required_inputs=["sop_id"],
-    required_outputs=["compliance_status"],
-    min_confidence=0.50,
-)
-
-QUALITY_APPROVAL_DEFINITION = IntentDefinition(
-    intent="quality_approval",
-    required_inputs=["approval_id"],
-    required_outputs=["approval_status"],
-    min_confidence=0.50,
-)
 
 SIMULATION_DEFINITION = IntentDefinition(
     intent="simulation",
@@ -505,6 +81,7 @@ SIMULATION_DEFINITION = IntentDefinition(
     required_outputs=["simulation_result"],
     min_confidence=0.50,
 )
+
 
 SELF_HEALING_PIPELINE_DEFINITION = IntentDefinition(
     intent="self_healing_pipeline",
@@ -514,6 +91,7 @@ SELF_HEALING_PIPELINE_DEFINITION = IntentDefinition(
     goal_type="other",
 )
 
+
 SITTINGFACE_PIPELINE_DEFINITION = IntentDefinition(
     intent="sittingface_pipeline",
     required_inputs=["question"],
@@ -522,12 +100,6 @@ SITTINGFACE_PIPELINE_DEFINITION = IntentDefinition(
     goal_type="other",
 )
 
-MAINTENANCE_DEFINITION = IntentDefinition(
-    intent="maintenance",
-    required_inputs=["equipment_id"],
-    required_outputs=["maintenance_status"],
-    min_confidence=0.50,
-)
 
 KNOWLEDGE_BASE_DEFINITION = IntentDefinition(
     intent="knowledge_base",
@@ -536,51 +108,17 @@ KNOWLEDGE_BASE_DEFINITION = IntentDefinition(
     min_confidence=0.50,
 )
 
+
 INTENT_DEFINITIONS: dict[str, IntentDefinition] = {
     definition.intent: definition
     for definition in (
-        DRUG_RESEARCH_DEFINITION,
-        BATCH_RECORD_DEFINITION,
-        BATCH_CREATION_DEFINITION,
-        BATCH_UPDATE_DEFINITION,
-        BATCH_DELETE_DEFINITION,
-        BATCH_HOLD_DEFINITION,
-        BATCH_CLOSE_DEFINITION,
-        WORK_ORDER_CREATE_DEFINITION,
-        WORK_ORDER_QUERY_DEFINITION,
-        WORK_ORDER_UPDATE_DEFINITION,
-        WORK_ORDER_DELETE_DEFINITION,
-        WORK_ORDER_STATUS_DEFINITION,
-        WORK_ORDER_HOLD_DEFINITION,
-        DECISION_INTELLIGENCE_DEFINITION,
-        APPROVAL_CREATE_DEFINITION,
-        APPROVAL_QUERY_DEFINITION,
-        APPROVAL_DECISION_DEFINITION,
-        APPROVAL_HOLD_DEFINITION,
-        CHANGE_CONTROL_DEFINITION,
-        CHANGE_CONTROL_CREATE_DEFINITION,
-        CHANGE_CONTROL_QUERY_DEFINITION,
-        CHANGE_CONTROL_UPDATE_DEFINITION,
-        CHANGE_CONTROL_DECISION_DEFINITION,
-        PRODUCTION_KPI_DEFINITION,
-        WAREHOUSE_SHIPPING_DEFINITION,
-        WORKER_DEFINITION,
         AUDIT_LOG_DEFINITION,
         COUNT_DEFINITION,
-        PLANT_TOPOLOGY_DEFINITION,
-        ASSET_MANAGEMENT_DEFINITION,
-        SOP_COMPLIANCE_DEFINITION,
-        QUALITY_APPROVAL_DEFINITION,
         SIMULATION_DEFINITION,
-        MAINTENANCE_DEFINITION,
         KNOWLEDGE_BASE_DEFINITION,
         SITTINGFACE_PIPELINE_DEFINITION,
     )
 }
-
-# ------------------------------------------------------------------
-# Legacy Execution Route
-# ------------------------------------------------------------------
 
 
 @dataclass(slots=True, frozen=True)
@@ -593,226 +131,6 @@ class IntentRoute:
     top_k: bool = False
 
 
-DRUG_RESEARCH_INTENT = IntentRoute(
-    intent="drug_research",
-    handler=drug_research_question_answer,
-    predicate=is_drug_research_question,
-    min_confidence=0.50,
-    question_source="visible",
-    top_k=True,
-)
-
-BATCH_RECORD_INTENT = IntentRoute(
-    intent="batch_record",
-    handler=batch_record_question_answer,
-    predicate=is_batch_record_question,
-)
-
-BATCH_CREATION_INTENT = IntentRoute(
-    intent="batch_creation_request",
-    handler=batch_creation_question_answer,
-    predicate=is_batch_creation_question,
-    question_source="visible",
-)
-
-BATCH_UPDATE_INTENT = IntentRoute(
-    intent="batch_update",
-    handler=batch_update_question_answer,
-    predicate=is_batch_update_question,
-    question_source="visible",
-)
-
-BATCH_DELETE_INTENT = IntentRoute(
-    intent="batch_delete",
-    handler=batch_delete_question_answer,
-    predicate=is_batch_delete_question,
-    question_source="visible",
-)
-
-BATCH_HOLD_INTENT = IntentRoute(
-    intent="batch_hold",
-    handler=batch_hold_question_answer,
-    predicate=is_batch_hold_question,
-    question_source="visible",
-)
-
-BATCH_CLOSE_INTENT = IntentRoute(
-    intent="batch_close",
-    handler=batch_close_question_answer,
-    predicate=is_batch_close_question,
-    question_source="visible",
-)
-
-WORK_ORDER_CREATE_INTENT = IntentRoute(
-    intent="work_order_create",
-    handler=work_order_create_question_answer,
-    predicate=is_work_order_create_question,
-    question_source="visible",
-)
-
-WORK_ORDER_QUERY_INTENT = IntentRoute(
-    intent="work_order_query",
-    handler=work_order_query_question_answer,
-    predicate=is_work_order_query_question,
-    question_source="visible",
-)
-
-WORK_ORDER_UPDATE_INTENT = IntentRoute(
-    intent="work_order_update",
-    handler=work_order_update_question_answer,
-    predicate=is_work_order_update_question,
-    question_source="visible",
-)
-
-WORK_ORDER_DELETE_INTENT = IntentRoute(
-    intent="work_order_delete",
-    handler=work_order_delete_question_answer,
-    predicate=is_work_order_delete_question,
-    question_source="visible",
-)
-
-WORK_ORDER_STATUS_INTENT = IntentRoute(
-    intent="work_order_status",
-    handler=work_order_status_question_answer,
-    predicate=is_work_order_status_question,
-    question_source="visible",
-)
-
-WORK_ORDER_HOLD_INTENT = IntentRoute(
-    intent="work_order_hold",
-    handler=work_order_hold_question_answer,
-    predicate=is_work_order_hold_question,
-    question_source="visible",
-)
-
-DECISION_INTELLIGENCE_INTENT = IntentRoute(
-    intent="decision_intelligence",
-    handler=decision_intelligence_question_answer,
-    predicate=is_decision_intelligence_question,
-    question_source="visible",
-    min_confidence=0.55,
-)
-
-APPROVAL_CREATE_INTENT = IntentRoute(
-    intent="approval_create",
-    handler=approval_create_question_answer,
-    predicate=is_approval_create_question,
-    question_source="visible",
-)
-
-APPROVAL_QUERY_INTENT = IntentRoute(
-    intent="approval_query",
-    handler=approval_query_question_answer,
-    predicate=is_approval_query_question,
-    question_source="visible",
-)
-
-APPROVAL_DECISION_INTENT = IntentRoute(
-    intent="approval_decision",
-    handler=approval_decision_question_answer,
-    predicate=is_approval_decision_question,
-    question_source="visible",
-)
-
-APPROVAL_HOLD_INTENT = IntentRoute(
-    intent="approval_hold",
-    handler=approval_hold_question_answer,
-    predicate=is_approval_hold_question,
-    question_source="visible",
-)
-
-CHANGE_CONTROL_INTENT = IntentRoute(
-    intent="change_control",
-    handler=change_control_question_answer,
-    predicate=is_change_control_question,
-    question_source="visible",
-)
-
-CHANGE_CONTROL_CREATE_INTENT = IntentRoute(
-    intent="change_control_create",
-    handler=change_control_question_answer,
-    predicate=is_change_control_create_question,
-    question_source="visible",
-)
-
-CHANGE_CONTROL_QUERY_INTENT = IntentRoute(
-    intent="change_control_query",
-    handler=change_control_question_answer,
-    predicate=is_change_control_query_question,
-    question_source="visible",
-)
-
-CHANGE_CONTROL_UPDATE_INTENT = IntentRoute(
-    intent="change_control_update",
-    handler=change_control_question_answer,
-    predicate=is_change_control_update_question,
-    question_source="visible",
-)
-
-CHANGE_CONTROL_DECISION_INTENT = IntentRoute(
-    intent="change_control_decision",
-    handler=change_control_question_answer,
-    predicate=is_change_control_decision_question,
-    question_source="visible",
-)
-
-PRODUCTION_KPI_INTENT = IntentRoute(
-    intent="production_kpi",
-    handler=production_kpi_question_answer,
-    predicate=is_production_kpi_question,
-)
-
-WAREHOUSE_SHIPPING_INTENT = IntentRoute(
-    intent="warehouse_shipping",
-    handler=warehouse_shipping_question_answer,
-    predicate=is_warehouse_shipping_question,
-    min_confidence=0.56,
-)
-
-WORKER_INTENT = IntentRoute(
-    intent="worker",
-    handler=worker_question_answer,
-    predicate=is_worker_question,
-    question_source="visible",
-)
-
-APPROVAL_INTENT = IntentRoute(
-    intent="approval",
-    handler=compliance_audit_approval_question_answer,
-    predicate=is_compliance_audit_question,
-    min_confidence=0.52,
-)
-
-AUDIT_LOG_INTENT = IntentRoute(
-    intent="audit_log",
-    handler=compliance_audit_approval_question_answer,
-    predicate=is_compliance_audit_question,
-    min_confidence=0.52,
-)
-
-SOP_COMPLIANCE_INTENT = IntentRoute(
-    intent="sop_compliance",
-    handler=sop_query_question_answer,
-    predicate=is_sop_query_question,
-    question_source="visible",
-)
-
-SITTINGFACE_PIPELINE_INTENT = IntentRoute(
-    intent="sittingface_pipeline",
-    handler=sittingface_pipeline_question_answer,
-    predicate=is_sittingface_pipeline_question,
-    min_confidence=0.40,
-    question_source="visible",
-)
-
-SPECIFICATION_DISCOVERY_INTENT = IntentRoute(
-    intent="specification_discovery",
-    handler=specification_discovery_question_answer,
-    predicate=is_specification_discovery_question,
-    min_confidence=0.30,
-    question_source="visible",
-)
-
 SELF_HEALING_PIPELINE_INTENT = IntentRoute(
     intent="self_healing_pipeline",
     handler=self_healing_pipeline_question_answer,
@@ -820,6 +138,7 @@ SELF_HEALING_PIPELINE_INTENT = IntentRoute(
     min_confidence=0.90,  # predicate-only intent; classifier should never match it
     question_source="visible",
 )
+
 
 CODEGEN_INTENT = IntentRoute(
     intent="codegen",
@@ -829,27 +148,23 @@ CODEGEN_INTENT = IntentRoute(
     question_source="visible",
 )
 
-FACILITY_QUERY_INTENT = IntentRoute(
-    intent="facility_query",
-    handler=facility_query_question_answer,
-    predicate=is_facility_query,
-    min_confidence=0.30,
-    question_source="visible",
-)
 
-PLANT_HIERARCHY_INTENT = IntentRoute(
-    intent="plant_hierarchy",
-    handler=plant_hierarchy_question_answer,
-    predicate=is_plant_hierarchy,
-    min_confidence=0.30,
+SITTINGFACE_PIPELINE_INTENT = IntentRoute(
+    intent="sittingface_pipeline",
+    handler=sittingface_pipeline_question_answer,
+    predicate=is_sittingface_pipeline_question,
+    min_confidence=0.40,
     question_source="visible",
 )
 
 
-# ── FALLBACK: World Graph Traversal ──────────────────────────────────────────
-# This intent matches ANY question that doesn't match other predicates.
-# It ensures intent is never None in the UNDERSTAND phase.
-# MUST be defined BEFORE INTENT_REGISTRY and placed LAST in the registry.
+SPECIFICATION_DISCOVERY_INTENT = IntentRoute(
+    intent="specification_discovery",
+    handler=specification_discovery_question_answer,
+    predicate=is_specification_discovery_question,
+    min_confidence=0.30,
+    question_source="visible",
+)
 
 
 async def world_graph_traversal_handler(question: str, **kwargs) -> dict:
@@ -867,6 +182,7 @@ async def world_graph_traversal_handler(question: str, **kwargs) -> dict:
     }
 
 
+
 def is_world_graph_traversal_question(question: str) -> bool:
     """Match any question - this is the fallback predicate.
 
@@ -874,6 +190,7 @@ def is_world_graph_traversal_question(question: str) -> bool:
     It catches all questions that don't match other specific predicates.
     """
     return True
+
 
 
 WORLD_GRAPH_TRAVERSAL_INTENT = IntentRoute(
@@ -885,46 +202,51 @@ WORLD_GRAPH_TRAVERSAL_INTENT = IntentRoute(
 )
 
 
-INTENT_REGISTRY: dict[str, IntentRoute] = {
-    route.intent: route
-    for route in (
-        SELF_HEALING_PIPELINE_INTENT,  # must be first — healing sentinel takes priority
-        CODEGEN_INTENT,  # before drug_research — "generate service" must not fall to LLM
-        FACILITY_QUERY_INTENT,
-        PLANT_HIERARCHY_INTENT,
-        DRUG_RESEARCH_INTENT,
-        BATCH_RECORD_INTENT,
-        BATCH_CREATION_INTENT,
-        BATCH_UPDATE_INTENT,
-        BATCH_DELETE_INTENT,
-        BATCH_HOLD_INTENT,
-        BATCH_CLOSE_INTENT,
-        WORK_ORDER_CREATE_INTENT,
-        WORK_ORDER_QUERY_INTENT,
-        WORK_ORDER_UPDATE_INTENT,
-        WORK_ORDER_DELETE_INTENT,
-        WORK_ORDER_STATUS_INTENT,
-        WORK_ORDER_HOLD_INTENT,
-        DECISION_INTELLIGENCE_INTENT,
-        APPROVAL_CREATE_INTENT,
-        APPROVAL_QUERY_INTENT,
-        APPROVAL_DECISION_INTENT,
-        APPROVAL_HOLD_INTENT,
-        CHANGE_CONTROL_INTENT,
-        CHANGE_CONTROL_CREATE_INTENT,
-        CHANGE_CONTROL_QUERY_INTENT,
-        CHANGE_CONTROL_UPDATE_INTENT,
-        CHANGE_CONTROL_DECISION_INTENT,
-        PRODUCTION_KPI_INTENT,
-        WAREHOUSE_SHIPPING_INTENT,
-        WORKER_INTENT,
-        AUDIT_LOG_INTENT,
-        SOP_COMPLIANCE_INTENT,
-        SITTINGFACE_PIPELINE_INTENT,  # ETASS-specific keywords
-        SPECIFICATION_DISCOVERY_INTENT,
-        WORLD_GRAPH_TRAVERSAL_INTENT,  # MUST BE LAST — fallback for unmatched questions
-    )
-}
+
+_HEAD_ROUTES: tuple[IntentRoute, ...] = (
+    SELF_HEALING_PIPELINE_INTENT,  # must be first — healing sentinel takes priority
+    CODEGEN_INTENT,  # before any domain intent — "generate service" must not fall to LLM
+)
+_TAIL_ROUTES: tuple[IntentRoute, ...] = (
+    SITTINGFACE_PIPELINE_INTENT,  # ETASS-specific keywords
+    SPECIFICATION_DISCOVERY_INTENT,
+    WORLD_GRAPH_TRAVERSAL_INTENT,  # MUST BE LAST of the static routes — fallback for unmatched questions
+)
+_domain_routes: dict[str, IntentRoute] = {}
+_runtime_routes: dict[str, IntentRoute] = {}
+
+# The live routing table. Mutated in place (never rebound) — intent_router.py
+# and others import this dict object directly.
+INTENT_REGISTRY: dict[str, IntentRoute] = {}
+
+
+def _rebuild_intent_registry() -> None:
+    ordered: dict[str, IntentRoute] = {}
+    for route in _HEAD_ROUTES:
+        ordered[route.intent] = route
+    for name, route in _domain_routes.items():
+        ordered.setdefault(name, route)
+    for route in _TAIL_ROUTES:
+        ordered.setdefault(route.intent, route)
+    for name, route in _runtime_routes.items():
+        ordered.setdefault(name, route)
+    INTENT_REGISTRY.clear()
+    INTENT_REGISTRY.update(ordered)
+
+
+_rebuild_intent_registry()
+
+
+def register_intent_definition(definition: IntentDefinition) -> None:
+    """Called by a domain plugin to add an IntentDefinition."""
+    INTENT_DEFINITIONS[definition.intent] = definition
+
+
+def register_intent_route(route: IntentRoute) -> None:
+    """Called by a domain plugin to add a route. Domain routes keep their
+    registration order, between the platform head and tail routes."""
+    _domain_routes[route.intent] = route
+    _rebuild_intent_registry()
 
 
 def get_intent_definition(
@@ -937,32 +259,32 @@ def get_intent_definition(
 
 
 # required_outputs / goal_type for intents that are only in INTENT_REGISTRY
-# (routable) but have no IntentDefinition entry — facility-hierarchy
-# sub-lookups, free-text search, and a handful of registry-only intents.
+# (routable) but have no IntentDefinition entry — free-text search, a
+# handful of registry-only intents, and whatever domains register through
+# register_intent_metadata() (e.g. facility-hierarchy sub-lookups).
 _EXTRA_REQUIRED_OUTPUTS: dict[str, list[str]] = {
-    "plant": ["lines"],
-    "line": ["stages", "workstations"],
-    "line_stage": ["stages"],
-    "line_workstation": ["workstations"],
-    "stage_workstation": ["workstations"],
     "document_search": ["documents"],
     "web_search": ["search_results"],
 }
 
 _EXTRA_GOAL_TYPES: dict[str, str] = {
-    "plant": "query",
-    "line": "query",
-    "line_stage": "query",
-    "line_workstation": "query",
-    "stage_workstation": "query",
     "document_search": "search",
     "web_search": "search",
     "self_healing_pipeline": "other",
     "codegen": "create",
     "specification_discovery": "create",
-    "facility_query": "query",
-    "plant_hierarchy": "query",
 }
+
+
+def register_intent_metadata(
+    intent_name: str, required_outputs: list[str] | None = None, goal_type: str | None = None
+) -> None:
+    """Called by a domain plugin for a registry-only intent with no
+    IntentDefinition (see resolve_required_outputs / resolve_goal_type)."""
+    if required_outputs is not None:
+        _EXTRA_REQUIRED_OUTPUTS[intent_name] = list(required_outputs)
+    if goal_type is not None:
+        _EXTRA_GOAL_TYPES[intent_name] = goal_type
 
 
 def resolve_required_outputs(intent_name: str) -> list[str]:
@@ -974,6 +296,7 @@ def resolve_required_outputs(intent_name: str) -> list[str]:
     return _EXTRA_REQUIRED_OUTPUTS.get(intent_name, [intent_name])
 
 
+
 def resolve_goal_type(intent_name: str) -> str:
     """goal_type string for `intent_name`: its IntentDefinition if registered,
     else the extra table above, defaulting to "query"."""
@@ -983,6 +306,7 @@ def resolve_goal_type(intent_name: str) -> str:
     return _EXTRA_GOAL_TYPES.get(intent_name, "query")
 
 
+
 # ---------------------------------------------------------------------------
 # Dynamic intent registration from soma charts
 # ---------------------------------------------------------------------------
@@ -990,10 +314,12 @@ def resolve_goal_type(intent_name: str) -> str:
 _somatic_compiler = None
 
 
+
 def set_somatic_compiler(compiler) -> None:
     """Wire the SomaticCompiler so the executor can register intents from charts."""
     global _somatic_compiler
     _somatic_compiler = compiler
+
 
 
 def get_somatic_compiler():
@@ -1003,6 +329,7 @@ def get_somatic_compiler():
     as an external repo it reads from, rather than an owned subsystem.
     """
     return _somatic_compiler
+
 
 
 def lookup_or_register_from_soma(intent_name: str) -> IntentRoute | None:
@@ -1029,8 +356,10 @@ def lookup_or_register_from_soma(intent_name: str) -> IntentRoute | None:
         min_confidence=0.40,
         question_source="visible",
     )
-    INTENT_REGISTRY[intent_name] = route
+    _runtime_routes[intent_name] = route
+    _rebuild_intent_registry()
     return route
+
 
 
 def register_domain_intent(domain: str, entity_name: str = "") -> IntentRoute | None:
@@ -1083,7 +412,8 @@ def register_domain_intent(domain: str, entity_name: str = "") -> IntentRoute | 
         question_source="payload",
     )
 
-    INTENT_REGISTRY[intent_name] = route
+    _runtime_routes[intent_name] = route
+    _rebuild_intent_registry()
     logger.info(f"Registered new domain intent: {intent_name}")
 
     return route

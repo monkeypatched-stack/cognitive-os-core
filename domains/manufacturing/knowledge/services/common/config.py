@@ -87,6 +87,10 @@ class Settings(BaseSettings):
     NATS_APPROVALS_QUEUE: str = "indus-approval-websocket"
     NATS_CHANGE_CONTROL_SUBJECT: str = "indus.change-control.queue"
     NATS_CHANGE_CONTROL_QUEUE: str = "indus-change-control-websocket"
+    # A change control reached Approved (auth); the PM service applies its
+    # SOP changes (services/pm/helpers/change_control_events.py).
+    NATS_CHANGE_CONTROL_APPROVED_SUBJECT: str = "indus.change-control.approved"
+    NATS_CHANGE_CONTROL_APPROVED_QUEUE: str = "indus-change-control-approved-pm"
     NATS_APPROVAL_DECISIONS_SUBJECT: str = "indus.approval-decisions.queue"
     NATS_APPROVAL_DECISIONS_QUEUE: str = "indus-approval-decisions-websocket"
     NATS_APPROVAL_AUDIT_SUBJECT: str = "indus.approval-audit.queue"

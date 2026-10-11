@@ -46,7 +46,7 @@ def _try_keycloak(token: str) -> dict | None:
         return None
     try:
         from fastapi.security import HTTPAuthorizationCredentials as _Creds
-        from services.file.src.core.keycloak import verify_jwt as _kc_verify
+        from services.common.keycloak import verify_jwt as _kc_verify
 
         return _kc_verify(_Creds(scheme="bearer", credentials=token))
     except Exception:

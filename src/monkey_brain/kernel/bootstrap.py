@@ -378,15 +378,19 @@ async def init_sittingface(app: Any, runtime: Any, lemon: Any) -> None:
         except Exception as exc:
             logger.warning("Broca ETASS agent registration skipped: %s", exc)
 
-        # Data-backed domain agents. Registered AFTER the ETASS/DDD agents so that where the
-        # two overlap, the one that actually reads the database wins the registry slot — the
-        # stubs return success unconditionally and query nothing.
-        try:
-            from domains.manufacturing.agents import register_manufacturing_agents
+        # Data-backed domain agents, from the loaded domain plugins
+        # (kernel/extensions.py). Registered AFTER the ETASS/DDD agents so
+        # that where the two overlap, the one that actually reads the
+        # database wins the registry slot — the stubs return success
+        # unconditionally and query nothing.
+        from src.monkey_brain.kernel.extensions import extensions, load_domain_plugins
 
-            register_manufacturing_agents(runtime=runtime)
-        except Exception as exc:
-            logger.warning("Manufacturing domain agent registration skipped: %s", exc)
+        load_domain_plugins()
+        for register_agents in extensions.agent_registrars:
+            try:
+                register_agents(runtime)
+            except Exception as exc:
+                logger.warning("Domain agent registration skipped (%s): %s", register_agents, exc)
 
         app.state.somatic_compiler = compiler
         try:
@@ -587,17 +591,19 @@ async def wire_subscribers(runtime: Any, policy: Any, observer: Any, learning: A
 
 
 async def init_domain_registry(app: Any) -> Any:
-    try:
-        from domains.package import DomainRegistry
+    """The domain package registry, if a loaded domain plugin provides one
+    (kernel/extensions.py); None in a process with no domains."""
+    from src.monkey_brain.kernel.extensions import extensions, load_domain_plugins
 
-        registry = DomainRegistry.instance()
-        domains_dir = Path(__file__).parents[3] / "domains"
-        registry.load_from_directory(domains_dir)
-        logger.info("Domain packages loaded: %s", registry.list_all())
-        return registry
-    except Exception as exc:
-        logger.warning("Domain registry skipped: %s", exc)
-        return None
+    load_domain_plugins()
+    for load_registry in extensions.domain_registry_loaders:
+        try:
+            registry = load_registry(app)
+            if registry is not None:
+                return registry
+        except Exception as exc:
+            logger.warning("Domain registry skipped: %s", exc)
+    return None
 
 
 async def run_health_checks(app: Any, pm: Any, lemon: Any, runtime: Any = None, policy: Any = None) -> None:

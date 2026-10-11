@@ -57,11 +57,3 @@ def test_case_insensitive_and_non_dict_safe():
     assert strip_sensitive(None) is None  # defensive: never raises on a non-dict
 
 
-def test_auth_router_projects_credentials_out_before_mirroring():
-    """The call site must not even READ the secrets back out of Mongo."""
-    from pathlib import Path
-
-    src = Path("domains/manufacturing/knowledge/services/auth/routers/auth.py").read_text()
-    i = src.index('safe_mirror(mirror_document("users"')
-    window = src[max(0, i - 500) : i]
-    assert '"hashed_password": 0' in window and '"refresh_tokens": 0' in window

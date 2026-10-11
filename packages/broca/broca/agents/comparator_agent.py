@@ -2,7 +2,7 @@
 real environment's actual query answer, producing an epistemic loss score.
 
 Thin wrapper around src.cortex.world_model_simulation.simulate() and
-src.monkey_brain.api.helpers.simulate_helpers' fetch_query_answer()/
+src.monkey_brain.kernel.simulate_helpers' fetch_query_answer()/
 compare_predicted_vs_actual() — the same functions ComparatorRuntime.run()
 already calls — so the SDLC graph gets a "comparator" capability node
 without duplicating that logic.
@@ -33,7 +33,7 @@ class ComparatorAgent(BaseETASSAgent):
 
         try:
             from src.cortex.world_model_simulation import simulate
-            from src.monkey_brain.api.helpers.simulate_helpers import (
+            from src.monkey_brain.kernel.simulate_helpers import (
                 compare_predicted_vs_actual,
                 fetch_query_answer,
             )

@@ -1103,12 +1103,15 @@ class LLMPlanner:
             for name, value in shared_resources.items():
                 lines.append(f"- {name}={value}")
 
-        network_facts = (getattr(context, "metadata", None) or {}).get("commerce_network_facts") or ()
-        if network_facts:
-            lines.append("")
-            lines.append("Commerce network knowledge:")
-            for fact in network_facts:
-                lines.append(f"- {fact}")
+        # Domain plugins add their own prompt sections through planning
+        # metadata (kernel/extensions.py::planning_metadata_providers), e.g.
+        # the commerce domain's "Commerce network knowledge".
+        for title, section_lines in (getattr(context, "metadata", None) or {}).get("domain_prompt_sections") or ():
+            if section_lines:
+                lines.append("")
+                lines.append(f"{title}:")
+                for item in section_lines:
+                    lines.append(f"- {item}")
         return "\n".join(lines)
 
     def _parse(self, raw: str) -> dict:

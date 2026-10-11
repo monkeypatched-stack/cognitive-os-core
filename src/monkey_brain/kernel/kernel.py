@@ -557,6 +557,12 @@ class Kernel:
         from services.common.secrets import validate_hmac_secrets_from_env
 
         validate_hmac_secrets_from_env()
+        # Domain plugins (kernel/extensions.py) register verticals, intents,
+        # classifier examples and hooks; load them before any later phase
+        # builds something that reads those registries.
+        from src.monkey_brain.kernel.extensions import load_domain_plugins
+
+        load_domain_plugins()
         self._health["config"] = ComponentHealth(name="config", state=HealthState.HEALTHY)
 
     # 2. Initialize External Agent Providers
@@ -1556,14 +1562,12 @@ class Kernel:
 
         app.state.planetary_runtime = planetary
         self.registry.register("planetary", planetary)
-        # api/routes/payments.py's auto-approve UPI simulator fires from a
-        # background timer thread with no Request/app.state to read
-        # app.state.planetary_runtime from the way every real HTTP route
-        # does -- this is the one place that real instance is reachable
-        # without one.
-        from src.monkey_brain.kernel.domains.payment_resolution import set_default_planetary_runtime
+        # Code that runs with no Request/app.state (background timers,
+        # domain callbacks such as a payment simulator) reaches the real
+        # instance through host_state.
+        from src.monkey_brain.kernel.host_state import set_planetary_runtime
 
-        set_default_planetary_runtime(planetary)
+        set_planetary_runtime(planetary)
         self._health["planetary"] = ComponentHealth(name="planetary", state=HealthState.HEALTHY)
 
         # Real NATS publishing for the context stream — additive to the

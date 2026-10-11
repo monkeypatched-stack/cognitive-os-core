@@ -109,7 +109,7 @@ def build_default_registry() -> EmbeddingRegistry:
     Provider hierarchy per modality:
         document / manual  → SBERTEmbedder (falls back to BOWEmbedder)
         image              → CLIPImageEmbedder (falls back to CLIPTextEmbedder)
-        video              → VideoEmbedder (frame sampling + CLIPImageEmbedder)
+        video              → registered by the actor repo's device plugin (kernel/extensions.py)
         audio              → WhisperAudioEmbedder (transcript + SBERT)
         telemetry / sensor → TelemetryEmbedder (statistical features)
         simulation         → SimulationEmbedder
@@ -134,7 +134,6 @@ def build_default_registry() -> EmbeddingRegistry:
     from src.monkey_brain.kernel.plan.embedding.code import CodeEmbedder
     from src.monkey_brain.kernel.plan.embedding.cad import CADEmbedder
     from src.monkey_brain.kernel.plan.embedding.image import CLIPImageEmbedder
-    from src.monkey_brain.kernel.plan.embedding.video import VideoEmbedder
     from src.monkey_brain.kernel.plan.embedding.audio import WhisperAudioEmbedder
 
     registry = EmbeddingRegistry()
@@ -145,7 +144,6 @@ def build_default_registry() -> EmbeddingRegistry:
     registry.register("manual", sbert)
 
     registry.register("image", CLIPImageEmbedder())
-    registry.register("video", VideoEmbedder())
     registry.register("audio", WhisperAudioEmbedder())
 
     registry.register("telemetry", TelemetryEmbedder())
@@ -159,4 +157,13 @@ def build_default_registry() -> EmbeddingRegistry:
     registry.register("code", CodeEmbedder())
     registry.register("cad", CADEmbedder())
 
+    # Extra modalities from domain/device plugins (e.g. video, which needs
+    # the actor's media stack).
+    from src.monkey_brain.kernel.extensions import extensions
+
+    for register_modalities in extensions.embedding_registrars:
+        try:
+            register_modalities(registry)
+        except Exception:
+            logger.debug("embedding registrar %r failed", register_modalities, exc_info=True)
     return registry

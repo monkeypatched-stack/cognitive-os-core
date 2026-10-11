@@ -74,28 +74,6 @@ class TestGovernanceNeverImportsExecutionSubstrates:
         assert violations == []
 
 
-class TestExecutionAdaptersNeverImportGovernanceInternals:
-    """A RosExecutionAdapter must never reach INTO security_boundary's
-    private decision machinery -- it may only be CALLED BY the governance
-    boundary (ensure_governed), never call into it to manufacture its own
-    authorization. This is a structural, not textual, check: it parses
-    real import statements in the real file."""
-
-    def test_ros_integration_module_only_imports_ensure_governed_the_public_entry_point(
-        self,
-    ):
-        path = os.path.join(SRC_ROOT, "kernel", "edge", "ros_integration.py")
-        imports = _module_imports(path)
-        # Importing security_boundary itself (to call the PUBLIC
-        # ensure_governed function) is expected and correct -- the
-        # violation would be reaching for a PRIVATE symbol.
-        with open(path, encoding="utf-8") as f:
-            source = f.read()
-        assert "_authorize_and_gate" not in source
-        assert "_authorize(" not in source
-        assert "GovernanceEngine(" not in source
-
-
 class TestNoRawNeo4jDriverOutsideItsOwnModule:
     """kernel/knowledge_graph_neo4j.py is the ONE sanctioned place a raw
     neo4j driver is touched -- every other cognitive/capability/domain

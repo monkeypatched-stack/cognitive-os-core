@@ -39,34 +39,6 @@ def _policy_unknown_distinct_from_failed() -> bool:
     return 'FAILED = "failed"' in text and 'UNKNOWN = "unknown"' in text and "UnknownOutcomeError" in text
 
 
-def _mutating_routes_have_idempotent() -> bool:
-    routes = SRC / "api" / "routes"
-    if not routes.exists():
-        return False
-    for path in routes.glob("*.py"):
-        try:
-            tree = ast.parse(path.read_text(errors="ignore"))
-        except SyntaxError:
-            return False
-        for node in ast.walk(tree):
-            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                continue
-            mutating = False
-            idem = False
-            for d in node.decorator_list:
-                if (
-                    isinstance(d, ast.Call)
-                    and isinstance(d.func, ast.Attribute)
-                    and d.func.attr in ("post", "put", "patch", "delete")
-                ):
-                    mutating = True
-                if isinstance(d, ast.Call) and isinstance(d.func, ast.Name) and d.func.id == "idempotent":
-                    idem = True
-            if mutating and not idem:
-                return False
-    return True
-
-
 def _production_runtime_construction() -> list[str]:
     findings: list[str] = []
     allowed = {
@@ -328,14 +300,39 @@ def _boundary_violations() -> dict[str, list[str]]:
     return violations
 
 
-# The control plane's own code: the HTTP API package and the route modules
-# that mount on it. Everything else under src/, plus services/common, is
-# core -- shared by the control plane and every Actor Runtime.
-CONTROL_PLANE_ROUTE_MODULES = (
-    SRC / "dashboard" / "routes.py",
-    SRC / "oql" / "routes.py",
-    SRC / "routing" / "routes.py",
+# Every Python source directory this repo ships (not tests): src/,
+# services/common, the bundled packages and SDKs, and the etass/benchmark
+# tooling -- a lazy import anywhere in them is as much a dependency as one
+# in src/.
+CORE_SOURCE_DIRS = (
+    "src",
+    "domains/manufacturing/knowledge/services/common",
+    "packages",
+    "sdk",
+    "monkeypatched_sdk",
+    "monkeypatched_cerberus_sdk",
+    "etass",
+    "benchmarks",
+    "demo",
 )
+
+
+def _core_python_files() -> list[Path]:
+    files: list[Path] = []
+    for rel in CORE_SOURCE_DIRS:
+        base = ROOT / rel
+        if base.is_dir():
+            files.extend(
+                p for p in sorted(base.rglob("*.py"))
+                if "tests" not in p.relative_to(base).parts and "__pycache__" not in p.parts
+            )
+    return files
+
+
+# The control plane (cognitive-os-control-plane) owns the HTTP API package
+# and the auth/agentos services. Everything in this repo -- src/ and
+# services/common -- is core, shared by the control plane and every Actor
+# Runtime, and must not import them.
 CONTROL_PLANE_MODULE_PREFIXES = ("src.monkey_brain.api", "services.agentos", "services.auth")
 
 
@@ -350,12 +347,10 @@ def _core_imports_control_plane() -> list[str]:
     control-plane app inside actor processes. Keeping this true is what
     lets core, control plane and actor live in separate repos.
     """
-    files = [*sorted((ROOT / "src").rglob("*.py")),
-             *sorted((ROOT / "domains/manufacturing/knowledge/services/common").rglob("*.py"))]
-    api_dir = SRC / "api"
+    files = _core_python_files()
     violations: list[str] = []
     for path in files:
-        if path.is_relative_to(api_dir) or path in CONTROL_PLANE_ROUTE_MODULES or path.name.startswith("test_"):
+        if path.name.startswith("test_"):
             continue
         try:
             tree = ast.parse(path.read_text(errors="ignore"))
@@ -370,6 +365,48 @@ def _core_imports_control_plane() -> list[str]:
                 continue
             for mod in mods:
                 if any(mod == p or mod.startswith(p + ".") for p in CONTROL_PLANE_MODULE_PREFIXES):
+                    violations.append(f"{path.relative_to(ROOT)}:{node.lineno}: import {mod}")
+    return violations
+
+
+# Domain and actor-only code lives in the actor repo (domains, devices, the
+# Actor Runtime) or the manufacturing-services repo; the core must never
+# import it -- domains plug in through kernel/extensions.py instead.
+DOMAIN_MODULE_PREFIXES = (
+    "src.monkey_brain.domains",
+    "src.monkey_brain.devices",
+    "src.monkey_brain.kernel.domains",
+    "src.monkey_brain.actor_runtime",
+    "domains",
+)
+PLATFORM_SERVICES = {"common", "agentos", "auth"}
+
+
+def _core_imports_domain() -> list[str]:
+    """Core / domain separation: no core module imports domain code or a
+    manufacturing service, at any level (function-scoped imports
+    included)."""
+    files = _core_python_files()
+    violations: list[str] = []
+    for path in files:
+        if path.name.startswith("test_"):
+            continue
+        try:
+            tree = ast.parse(path.read_text(errors="ignore"))
+        except SyntaxError:
+            continue
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                mods = [a.name for a in node.names]
+            elif isinstance(node, ast.ImportFrom) and not node.level:
+                mods = [node.module or ""]
+            else:
+                continue
+            for mod in mods:
+                parts = mod.split(".")
+                is_domain = any(mod == p or mod.startswith(p + ".") for p in DOMAIN_MODULE_PREFIXES)
+                is_mfg_service = parts[0] == "services" and len(parts) > 1 and parts[1] not in PLATFORM_SERVICES
+                if is_domain or is_mfg_service:
                     violations.append(f"{path.relative_to(ROOT)}:{node.lineno}: import {mod}")
     return violations
 
@@ -653,6 +690,7 @@ def collect() -> dict:
     hard["boundary_society_no_direct_cognitive_os"] = not boundary["society_no_direct_cognitive_os"]
     hard["boundary_no_module_level_cognitive_imports"] = not boundary["no_module_level_cognitive_imports"]
     hard["core_imports_control_plane"] = not _core_imports_control_plane()
+    hard["core_imports_domain"] = not _core_imports_domain()
     hard["untrusted_security_authority_assignments"] = not _untrusted_security_authority_violations()
     hard["governed_commitment_on_action_executor"] = "ensure_governed" in (
         SRC / "kernel" / "pipeline" / "action_executor.py"
@@ -669,7 +707,8 @@ def collect() -> dict:
     hard["operation_classification_default_critical"] = "return OperationClass.SECURITY_CRITICAL" in (
         SRC / "kernel" / "operation_classification.py"
     ).read_text(errors="ignore")
-    hard["mutating_routes_idempotent"] = _mutating_routes_have_idempotent()
+    # mutating_routes_idempotent: checked by scripts/check_route_idempotency.py in
+    # cognitive-os-control-plane and cognitive-os-actor, which own the routes.
     hard["security_operation_unknown_state"] = "RECONCILIATION_REQUIRED" in (
         SRC / "kernel" / "security_operation.py"
     ).read_text(errors="ignore")

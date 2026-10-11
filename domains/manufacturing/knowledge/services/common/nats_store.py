@@ -125,6 +125,15 @@ async def publish_change_control_event(event: dict) -> str:
     return settings.NATS_CHANGE_CONTROL_SUBJECT
 
 
+async def publish_change_control_approved_event(event: dict) -> str:
+    event["event_type"] = str(event.get("event_type") or "change-control-approved")
+    event["subject"] = settings.NATS_CHANGE_CONTROL_APPROVED_SUBJECT
+    await publish_event(
+        _event_bytes(event), subject=settings.NATS_CHANGE_CONTROL_APPROVED_SUBJECT
+    )
+    return settings.NATS_CHANGE_CONTROL_APPROVED_SUBJECT
+
+
 async def publish_approval_decision_event(event: dict) -> str:
     event["event_type"] = str(event.get("event_type") or "approval-decision")
     event["subject"] = settings.NATS_APPROVAL_DECISIONS_SUBJECT
@@ -198,6 +207,14 @@ async def subscribe_change_control_events(callback):
         callback,
         subject=settings.NATS_CHANGE_CONTROL_SUBJECT,
         queue=settings.NATS_CHANGE_CONTROL_QUEUE,
+    )
+
+
+async def subscribe_change_control_approved_events(callback):
+    return await subscribe_events(
+        callback,
+        subject=settings.NATS_CHANGE_CONTROL_APPROVED_SUBJECT,
+        queue=settings.NATS_CHANGE_CONTROL_APPROVED_QUEUE,
     )
 
 

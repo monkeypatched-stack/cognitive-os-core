@@ -1,19 +1,16 @@
-"""Resolves a request to the correct vertical's capability bus.
+"""Vertical registry: resolves a request to a registered vertical's
+capability bus and builds its execution engine.
 
-API/route code should never construct a vertical's bus directly — it asks
-this router for one instead. Today only Grocery is registered, so
-resolve_vertical() always returns it, but this is the real seam where a
-second vertical would be registered and selected, instead of a route
-module hardcoding which vertical it runs and importing that vertical's
-capability classes directly.
+Domain-neutral core. Verticals (grocery, robotics, ...) live in the actor
+repo and register themselves here (register_vertical) when their domain
+plugin loads (kernel/extensions.py); this module never imports one. With
+no vertical registered -- a control-plane process, which never runs actor
+cognition -- has_verticals() is False and callers skip building an engine.
 
-Named `vertical_router`, not `capability_router`, to avoid colliding with
-the existing, differently-scoped `runtime/capability_router.py` (which
-maps a capability string to a Broca-agent group label — an unrelated
-concept). This module never imports a vertical's own module (e.g.
-grocery.py) — a vertical imports this module and registers itself, the
-same "specific registers into generic" direction used throughout the
-domain/vertical split.
+Which vertical is the default: COGNITIVEOS_DEFAULT_VERTICAL if set,
+otherwise the first one registered.
+
+(Formerly kernel/domains/vertical_router.py.)
 """
 
 from __future__ import annotations
@@ -22,7 +19,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Callable
 
-logger = logging.getLogger("agentos.domains.vertical_router")
+logger = logging.getLogger("agentos.verticals")
 
 
 @dataclass(frozen=True)
@@ -71,11 +68,27 @@ def register_vertical(name: str, builder: Callable[[], VerticalRuntime]) -> None
     _VERTICAL_REGISTRY[name] = builder
 
 
-def resolve_vertical(name: str = "grocery") -> VerticalRuntime:
-    """Resolve the named vertical's runtime. Defaults to the only vertical
-    that exists today — the default lives here, not in each caller, so a
-    route never has to name a vertical to get one."""
-    builder = _VERTICAL_REGISTRY.get(name)
+def has_verticals() -> bool:
+    return bool(_VERTICAL_REGISTRY)
+
+
+def default_vertical_name() -> str | None:
+    """COGNITIVEOS_DEFAULT_VERTICAL if set, else the first registered
+    vertical, else None (nothing registered)."""
+    import os
+
+    configured = os.getenv("COGNITIVEOS_DEFAULT_VERTICAL", "").strip()
+    if configured:
+        return configured
+    return next(iter(_VERTICAL_REGISTRY), None)
+
+
+def resolve_vertical(name: str | None = None) -> VerticalRuntime:
+    """Resolve the named vertical's runtime, or the default vertical
+    (default_vertical_name()) when no name is given -- the default lives
+    here, not in each caller, so a route never has to name a vertical."""
+    name = name or default_vertical_name()
+    builder = _VERTICAL_REGISTRY.get(name or "")
     if builder is None:
         raise KeyError(
             f"no vertical registered for {name!r} (registered: {sorted(_VERTICAL_REGISTRY)})"
@@ -154,7 +167,7 @@ def _build_execution_engine(
 
 
 def build_execution_engine(
-    name: str = "grocery",
+    name: str | None = None,
     context_stream: Any = None,
     connectivity_check: Callable[[str], tuple[bool, str, str]] | None = None,
     edge_governance: Any = None,
@@ -181,7 +194,7 @@ def build_execution_engine(
 
 def build_runtime_engine(
     observation_provider: Any,
-    name: str = "grocery",
+    name: str | None = None,
     context_stream: Any = None,
     transition_model: Any = None,
     current_plans: dict[str, Any] | None = None,

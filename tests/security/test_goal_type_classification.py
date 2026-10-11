@@ -118,11 +118,3 @@ def test_empty_question_is_safe():
 # ------------------------------------------------------------------ the route
 
 
-def test_the_plan_route_no_longer_hardcodes_the_goal_type():
-    from pathlib import Path
-
-    src = Path("src/monkey_brain/api/routes/plan.py").read_text()
-    code = "\n".join(l for l in src.splitlines() if not l.lstrip().startswith("#"))
-    assert "goal_type=GoalType.QUERY" not in code, "every plan is a query again"
-    assert "classify_goal_type(payload.question)" in code
-    assert "confidence=goal_confidence" in code

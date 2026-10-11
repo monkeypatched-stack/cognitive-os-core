@@ -201,14 +201,18 @@ class PromptCompilerAgent(BaseETASSAgent):
         if spec.value_object:
             lines.append(f"Value Object: {spec.value_object}")
 
-        # Pull constitutions from the domain package if registered
+        # Pull constitutions from the domain package if one is registered
+        # (a domain plugin's domain_policy_providers, kernel/extensions.py)
         try:
-            from domains.package import DomainRegistry
+            from src.monkey_brain.kernel.extensions import extensions
 
-            pkg = DomainRegistry.instance().get(spec.domain)
-            if pkg and pkg.policies:
+            policies = next(
+                (found for provider in extensions.domain_policy_providers if (found := provider(spec.domain))),
+                [],
+            )
+            if policies:
                 lines.append("Domain Constitutions (from package):")
-                for p in pkg.policies[:3]:
+                for p in policies[:3]:
                     name = p.get("name", "unnamed")
                     lines.append(f"  - {name}")
         except Exception:

@@ -182,27 +182,6 @@ class SocietyRuntime:
         duplicate-state-holder lesson from Step 12.7's context_stream/
         interaction_manager fix."""
         self._governance = SocietyGovernanceEngine()
-        from src.monkey_brain.kernel.integrations import (
-            SharedResourceInventoryIntegration,
-        )
-
-        self._inventory_integration = SharedResourceInventoryIntegration(
-            self.shared_resources,
-            self.update_shared_resources,
-            self.record_coordination,
-        )
-        """Step 12.10: same placement fix as collective_learning above —
-        this was PlanetaryRuntime-only despite governing individual actors'
-        permissions/trust/safety, which is society-level state (point 3:
-        "Society Runtime should own... society policies"). Distinct from
-        `Society.policies` (12.3's plain string list, coarse-grained,
-        Society-domain-object-level) and from `kernel/governance.py`'s
-        differently-scoped, differently-purposed, LIVE-in-production
-        `SocietyGovernanceEngine` (runtime charter/jurisdiction evaluation for
-        the Gateway's /plan /execute /predict /query routes) — three
-        distinct concepts, only two of which happen to share this class
-        name. See governance.py's module docstring for the full
-        disambiguation."""
         self._tick_count = 0
         self._context_events: list[WorldEvent] = []
         self._context_stream = SocietyContextStream()
@@ -908,14 +887,6 @@ class SocietyRuntime:
         merged = {**self.shared_resources(), **resources}
         metadata = {**self._society.metadata, "shared_resources": merged}
         self._society = dataclasses.replace(self._society, metadata=metadata)
-
-    def inventory_replenishment(self, item: str) -> dict[str, Any]:
-        """Inspect store inventory against its configured minimum level."""
-        return self._inventory_integration.observe(item)
-
-    def replenish_inventory(self, item: str, quantity: float, supplier: str = "") -> dict[str, Any]:
-        """Apply a completed supplier replenishment to shared store stock."""
-        return self._inventory_integration.apply_replenishment(item, quantity, supplier)
 
     def add_policy(self, policy: str) -> None:
         self._society = dataclasses.replace(

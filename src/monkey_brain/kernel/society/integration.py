@@ -98,7 +98,6 @@ from src.monkey_brain.kernel.society.activation import (
     SocietyActivationEngine,
     SocietyActivationResult,
 )
-from src.monkey_brain.kernel.society.commerce_network import CommerceNetwork
 from src.monkey_brain.kernel.relationships import RelationshipGraph, RelationshipKind
 from src.monkey_brain.kernel.society.actor_lifecycle_controller import (
     ActorLifecycleController,
@@ -602,12 +601,15 @@ class PlanetaryRuntime:
             self._geo_registry,
         )
 
-        # Society-level commerce network representing economic relationships and
-        # interactions between actors. This is maintained as a separate domain
-        # subsystem from the actor runtime and can evolve independently.
+        # Domain subsystems (e.g. a commerce network) are not part of the
+        # core: domain plugins attach to this runtime through
+        # kernel/extensions.py hooks (federation_listeners,
+        # planning_metadata_providers, ...). Load them before anything below
+        # asks for a vertical.
+        from src.monkey_brain.kernel.extensions import extensions as _extensions, load_domain_plugins
 
-        # TODO: this must not be injected here the two systems must be completely separated
-        self._commerce_network = CommerceNetwork()
+        load_domain_plugins()
+        self._extensions = _extensions
 
         from src.monkey_brain.kernel.society.delegation import DelegationRegistry
 
@@ -646,9 +648,7 @@ class PlanetaryRuntime:
         self._perturbation_queue = PerturbationQueue()
 
         # Factory for constructing the execution engine used by domain-specific capabilities.
-        from src.monkey_brain.kernel.domains.vertical_router import (
-            build_execution_engine,
-        )
+        from src.monkey_brain.kernel.verticals import build_execution_engine, has_verticals
 
         # In-memory registry of all society runtimes managed by this planetary runtime.
         self._societies: dict[str, SocietyRuntime] = {}
@@ -737,19 +737,18 @@ class PlanetaryRuntime:
             edge_governance = self._local_governance
         self._connectivity_check = connectivity_check
 
-        # Grocery registers itself on import (vertical_router does not import
-        # verticals). Boot used to hit this before any grocery import, so
-        # resolve_vertical("grocery") failed with an empty registry.
-        from src.monkey_brain.kernel.domains import (
-            grocery as _grocery_vertical,
-        )  # noqa: F401
-
-        # Build the domain execution engine with the current context stream and safety checks.
-        self._execution_engine = build_execution_engine(
-            "grocery",
-            context_stream=self.context_stream,
-            connectivity_check=connectivity_check,
-            edge_governance=edge_governance,
+        # Build the domain execution engine for the default vertical (verticals
+        # register themselves when their domain plugin loads, above). No
+        # vertical -- the control plane, which never runs actor cognition --
+        # means no engine.
+        self._execution_engine = (
+            build_execution_engine(
+                context_stream=self.context_stream,
+                connectivity_check=connectivity_check,
+                edge_governance=edge_governance,
+            )
+            if has_verticals()
+            else None
         )
 
         # Attach each restored society to the planetary runtime.
@@ -2981,37 +2980,32 @@ return new_count
         return state
 
     def _subscribe_actor_inbox(self, actor_id: str, profile: Any) -> None:
-        """Multi-Actor Execution Handoff: real per-actor NATS inbox
-        (kernel/domains/grocery.py::subscribe_actor_inbox), so
-        AskActorCapability's real point-to-point request/reply has a real
-        subscriber to answer it. Called from every real place an Actor
-        becomes live — this method (the canonical registration path) AND
-        the boot-time actor-reload loop below (_load_actors, which calls
-        SocietyRuntime.register_actor directly and never reaches this
-        method at all) — not just once, since either path alone would
-        leave some actors with no live inbox.
+        """Run the domain plugins' actor-registered hooks
+        (kernel/extensions.py::actor_registered_hooks) for an Actor that
+        just became live -- e.g. the grocery domain subscribes the actor's
+        per-actor NATS inbox so AskActorCapability's point-to-point
+        request/reply has a subscriber to answer it. Called from every
+        place an Actor becomes live: this method's caller (the canonical
+        registration path) AND the boot-time actor-reload loop (_load_actors,
+        which calls SocietyRuntime.register_actor directly) -- either path
+        alone would leave some actors without their hooks.
 
-        Fire-and-forget (asyncio.create_task): register_actor() itself
-        isn't async, and turning it async would ripple through every
-        caller; a dropped subscription here just means this one actor's
-        AskActorCapability calls fall back to the in-process degrade path
-        (grocery.py's own AskActorCapability.handle()), never fatal."""
-        try:
-            import asyncio
-            from src.monkey_brain.kernel.domains.grocery import subscribe_actor_inbox
+        A hook may return an awaitable; it runs fire-and-forget
+        (asyncio.create_task) and is tracked for wait_for_inbox_subscriptions(),
+        since register_actor() itself isn't async. A failed hook is logged,
+        never fatal."""
+        import asyncio
+        import inspect
 
-            goals = list(profile.goals) if getattr(profile, "goals", None) else []
-            name = profile.identity.name
-            actor_role = f"{name}, whose responsibilities include: {', '.join(goals)}" if goals else name
-            task = asyncio.create_task(subscribe_actor_inbox(self, actor_id, actor_role))
-            self._inbox_subscription_tasks.add(task)
-            task.add_done_callback(self._inbox_subscription_tasks.discard)
-        except Exception:
-            logger.debug(
-                "_subscribe_actor_inbox: suppressed exception for %s",
-                actor_id,
-                exc_info=True,
-            )
+        for hook in self._extensions.actor_registered_hooks:
+            try:
+                result = hook(self, actor_id, profile)
+                if inspect.isawaitable(result):
+                    task = asyncio.ensure_future(result)
+                    self._inbox_subscription_tasks.add(task)
+                    task.add_done_callback(self._inbox_subscription_tasks.discard)
+            except Exception:
+                logger.debug("actor-registered hook %r failed for %s", hook, actor_id, exc_info=True)
 
     async def wait_for_inbox_subscriptions(self) -> None:
         """Wait for all subscriptions scheduled during startup/registration."""
@@ -3420,10 +3414,6 @@ return new_count
     @property
     def membership_registry(self) -> Any:
         return self._membership_registry
-
-    @property
-    def commerce_network(self) -> CommerceNetwork:
-        return self._commerce_network
 
     @property
     def delegation_registry(self) -> Any:
@@ -4273,14 +4263,21 @@ return new_count
         as any other member society, since a Federation may be created and
         managed by a coordinating society that isn't itself a member."""
         federation = self._federation_manager.create_federation(name, description, member_society_ids)
-        self._commerce_network.attach_federation(federation.federation_id, federation.member_society_ids)
+        self._notify_federation_listeners(federation.federation_id, federation.member_society_ids)
         return federation
+
+    def _notify_federation_listeners(self, federation_id: str, member_society_ids: Any) -> None:
+        for listener in self._extensions.federation_listeners:
+            try:
+                listener(self, federation_id, member_society_ids)
+            except Exception:
+                logger.warning("federation listener %r failed for %s", listener, federation_id, exc_info=True)
 
     def join_federation(self, federation_id: str) -> Federation | None:
         """Adds THIS PlanetaryRuntime's own society to a federation."""
         federation = self._federation_manager.add_member(federation_id, self.society.society_id)
         if federation is not None:
-            self._commerce_network.attach_federation(federation_id, federation.member_society_ids)
+            self._notify_federation_listeners(federation_id, federation.member_society_ids)
             self.context_stream.publish(
                 ContextEvent(
                     event_type=ContextEventType.WORLD_UPDATE,
@@ -6970,13 +6967,10 @@ return new_count
                 logger.warning("Redis client close failed: %s", exc)
         if getattr(app.state, "planetary_runtime", None) is self:
             app.state.planetary_runtime = None
-        from src.monkey_brain.kernel.domains.payment_resolution import (
-            get_default_planetary_runtime,
-            set_default_planetary_runtime,
-        )
+        from src.monkey_brain.kernel.host_state import get_planetary_runtime, set_planetary_runtime
 
-        if get_default_planetary_runtime() is self:
-            set_default_planetary_runtime(None)
+        if get_planetary_runtime() is self:
+            set_planetary_runtime(None)
         logger.info("PlanetaryRuntime shutdown complete")
 
     # ── Serialization ────────────────────────────────────────────────────

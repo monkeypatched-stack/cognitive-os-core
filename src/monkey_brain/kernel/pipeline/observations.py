@@ -200,72 +200,13 @@ class WorldPollingProvider:
         observations = []
         provenance = Provenance(source="world_polling", method="tensor_read", reliability=0.9)
 
-        # Drone telemetry (kernel/edge/drone_state.py): independent of the
-        # world tensor below, so this runs even when world is None — a
-        # robot actor's own telemetry is not part of the shared world
-        # state, it's this specific actor's own sensed reality. Never
-        # raises, never fabricates: no adapter registered for this
-        # actor_id, or its telemetry has gone stale, means no drone
-        # observations this tick, not fake ones.
-        try:
-            from src.monkey_brain.kernel.edge.drone_state import get_drone_adapter, is_fresh
+        # Device telemetry (e.g. a drone's) arrives through registered
+        # auxiliary sources below -- the actor repo's device adapters
+        # register one per actor (register_observation_source).
 
-            adapter = get_drone_adapter(actor_id)
-            logger.info("DIAG drone telemetry: actor_id=%r adapter=%r", actor_id, adapter)
-            if adapter is not None:
-                state = adapter.latest_state()
-                logger.info("DIAG drone telemetry: state=%r is_fresh=%r", state, is_fresh(state))
-                if is_fresh(state):
-                    drone_provenance = Provenance(source="px4_ros", method="telemetry", reliability=0.95)
-                    for attribute, value in (
-                        ("armed", state.armed),
-                        ("position_x", state.position_x),
-                        ("position_y", state.position_y),
-                        ("position_z", state.position_z),
-                        ("heading", state.heading),
-                        ("battery", state.battery),
-                        ("flight_mode", state.flight_mode),
-                        ("gps_state", state.gps_state),
-                        ("disabled", state.disabled),
-                    ):
-                        if value is not None:
-                            observations.append(
-                                Observation(
-                                    entity=actor_id,
-                                    attribute=attribute,
-                                    value=value,
-                                    confidence=drone_provenance.reliability,
-                                    provenance=drone_provenance,
-                                )
-                            )
-
-                    # Simulator-only crash-test collision (kernel/edge/
-                    # px4_ros_adapter.py's "CrashTest" branch): its own,
-                    # distinct Provenance (source="simulator", not
-                    # "px4_ros") -- this is a discrete simulated event, not
-                    # routine telemetry. Reuses this SAME per-tick polling
-                    # pipeline rather than a proactive push, so no special
-                    # crash-specific cognitive runtime is needed: the
-                    # actor's normal recurring tick picks it up exactly like
-                    # every other drone-telemetry attribute above.
-                    if state.collision_event is not None:
-                        observations.append(
-                            Observation(
-                                entity=actor_id,
-                                attribute="collision_event",
-                                value=state.collision_event,
-                                confidence=1.0,
-                                provenance=Provenance(
-                                    source="simulator", method="collision_detection", reliability=1.0
-                                ),
-                            )
-                        )
-        except Exception:
-            logger.info("observe: drone telemetry suppressed exception", exc_info=True)
-
-        # Auxiliary sources (voice/video/future sensors), registered
-        # dynamically via register_observation_source() above — same
-        # never-crash contract as drone telemetry: one broken source is
+        # Auxiliary sources (device telemetry, voice/video, future sensors),
+        # registered dynamically via register_observation_source() above —
+        # never-crash contract: one broken source is
         # logged and skipped, never allowed to blank out every other
         # source or fail the tick.
         for source in _aux_providers_for(actor_id):

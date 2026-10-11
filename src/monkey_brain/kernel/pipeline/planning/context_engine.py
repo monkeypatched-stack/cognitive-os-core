@@ -24,7 +24,6 @@ entry point kernel/society/transaction.py uses.
 from __future__ import annotations
 
 import logging
-import os
 import re
 import time
 from typing import Any
@@ -37,54 +36,6 @@ from src.monkey_brain.kernel.timeline.entry import TimelineKind
 
 logger = logging.getLogger("agentos.pipeline.planning.context_engine")
 
-# kernel/domains/grocery.py registers every capability -- grocery AND
-# robot (kernel/domains/robot.py's Arm/Takeoff/Waypoint/Land/Heartbeat)
-# -- on ONE shared CommerceCapabilityBus; vertical_router.py's own
-# docstring calls this "the only vertical this codebase has" and
-# documents a real second vertical as future work, not yet built.
-# Confirmed live this is a genuinely different domain, not a cosmetic
-# label difference: a robot actor's LLM prompt offered the full mixed
-# list produced a plan that tried "ProductSelection" on a hallucinated
-# "weapon_001" for what was really an "Arm the drone" step -- grocery
-# and flight-control capabilities read as interchangeable options to a
-# small model with no domain boundary drawn between them at all.
-# _retrieve_available_capabilities below draws that boundary without
-# requiring a second real VerticalRuntime/bus (a much larger change
-# touching planner/plan_validator/context_projector wiring too) --
-# same shared bus, but each actor's own PROMPT only ever lists the
-# subset of names relevant to its own domain.
-# Heartbeat (robot.py's own generic ROS liveness capability, built for
-# the swarm-readiness audit) is NOT one of Px4RosExecutionAdapter's four
-# implemented operations (robot.py's own docstring: "these expose
-# exactly the four operations Px4RosExecutionAdapter.invoke() actually
-# implements (Arm/Takeoff/Waypoint/Land)") -- confirmed live, offering
-# it to a PX4-bound drone got "unsupported PX4 capability: Heartbeat"
-# every time, since the adapter simply never claims to support that
-# name. Left out of the offered set entirely: it isn't a flight action
-# this mission needs, and it isn't compatible with this specific
-# adapter regardless of what plan asks for it.
-_PX4_CAPABILITY_NAMES = frozenset({"Arm", "Takeoff", "Waypoint", "Land"})
-# Ground-robot (Nav2) capabilities (kernel/domains/robot.py) -- confirmed
-# live these were registered on the capability bus but never reached a
-# robot actor's own planner prompt because the old, single
-# _ROBOT_CAPABILITY_NAMES allowlist predated them: a real NavigateToPose/
-# Stop call was registered and governed correctly end-to-end, but the
-# model never saw them as options at all, so a ground-robot actor's plan
-# always came back empty for any drive-somewhere goal.
-_NAV2_CAPABILITY_NAMES = frozenset({"NavigateToPose", "Stop"})
-# Was one combined frozenset (_ROBOT_CAPABILITY_NAMES) covering every
-# vehicle kind -- confirmed live that once NAV2 names were added to it, a
-# GROUND robot's planner started seeing Arm/Takeoff/Waypoint/Land as
-# "available" too (nothing here distinguished vehicle kind), and gemma-3-4b
-# duly hallucinated a "Land" step onto an otherwise-correct NavigateToPose
-# plan -- rejected by Nav2RosExecutionAdapter ("unsupported Nav2
-# capability: Land") same as any other invented step, but it still turned
-# a real, successful drive into a "goal_achieved: false" response. Kept as
-# the union for backward compatibility: any robot-class actor that
-# doesn't set ROBOT_VEHICLE_KIND (see _retrieve_available_capabilities
-# below) gets exactly the old combined behavior, never a narrower one it
-# didn't ask for.
-_ROBOT_CAPABILITY_NAMES = _PX4_CAPABILITY_NAMES | _NAV2_CAPABILITY_NAMES
 # Cross-domain primitives every actor legitimately needs regardless of
 # domain, split by whether they need a real counterparty to succeed.
 # SELF-CONTAINED ones never reference another actor by name/id, so
@@ -335,7 +286,7 @@ class ContextConstructionEngine:
         activated_ids = set(current_society_context.activated_society_ids()) if current_society_context else set()
         shared_goals = self._retrieve_shared_goals(activated_ids)
         shared_resources = self._retrieve_shared_resources(activated_ids)
-        network_facts = self._retrieve_commerce_network(goal_text, activated_ids)
+        domain_metadata = self._retrieve_domain_metadata(actor_id, goal_text, activated_ids)
 
         experiences = self._rank_and_dedupe(experiences, activated_ids)
         conversations = self._rank_and_dedupe(conversations, activated_ids)
@@ -373,10 +324,10 @@ class ContextConstructionEngine:
                 "presence_history": presence_history,
                 "shared_goals": shared_goals,
                 "shared_resources": shared_resources,
-                "commerce_network_facts": network_facts,
                 "retrieval_latency_ms": retrieval_latency,
                 "retrieval_total_latency_ms": round((time.perf_counter() - retrieval_started) * 1000, 3),
                 "affiliation_lookup_performed": self._planetary_runtime is not None,
+                **domain_metadata,
                 **(external_metadata or {}),
             },
         )
@@ -945,7 +896,7 @@ class ContextConstructionEngine:
         # same resolution ProductSelectionCapability itself uses at
         # execution time) are pulled to the front here so the LLM always has
         # a real id=... fact to copy instead of fabricating one.
-        ranked_products = self._ranked_product_candidates(goal_text)
+        ranked_products = self._ranked_domain_candidates(goal_text)
         ranked_ids = {e.entity_id for e in ranked_products}
         entities = ranked_products + [e for e in entities if e.entity_id not in ranked_ids]
         # Found live: a generic standing goal ("buy groceries efficiently")
@@ -1060,40 +1011,26 @@ class ContextConstructionEngine:
                 break
         return resolved
 
-    def _ranked_product_candidates(self, goal_text: str, limit_per_item: int = 3) -> list[Any]:
-        """Real product candidates for goal_text, ranked by keyword-match
-        specificity — open_products()/_match_score() are the same
-        resolution ProductSelectionCapability's own fallback path uses, run
-        here up front so grounding surfaces a real id=... fact for the LLM
-        to copy. Grocery-only for now (the sole vertical this codebase
-        has); fails open to [] if unavailable, same idiom
-        _retrieve_available_capabilities above already uses for the same
-        reason.
-        """
-        try:
-            from src.monkey_brain.kernel.domains.grocery import (
-                open_products,
-                _match_score,
-                _split_requested_items,
-            )
-        except Exception:
-            return []
+    def _ranked_domain_candidates(self, goal_text: str) -> list[Any]:
+        """Knowledge-graph entities domain plugins rank first for goal_text
+        (kernel/extensions.py::knowledge_candidate_providers) -- e.g. the
+        grocery domain's real, business-rule-filtered product matches, so
+        grounding surfaces a real id=... fact for the LLM to copy instead
+        of letting it fabricate one. [] when no domain provides any."""
+        from src.monkey_brain.kernel.extensions import extensions
+
         candidates: list[Any] = []
         seen: set[str] = set()
-        for phrase in _split_requested_items(goal_text):
+        for provide in extensions.knowledge_candidate_providers:
             try:
-                products = open_products(self._knowledge_graph, item_phrase=phrase)
+                found = provide(self._knowledge_graph, goal_text) or []
             except Exception:
+                logger.debug("knowledge candidate provider %r failed", provide, exc_info=True)
                 continue
-            scored = sorted(
-                (p for p in products if _match_score(p.name, phrase) > 0),
-                key=lambda p: _match_score(p.name, phrase),
-                reverse=True,
-            )
-            for product in scored[:limit_per_item]:
-                if product.entity_id not in seen:
-                    seen.add(product.entity_id)
-                    candidates.append(product)
+            for entity in found:
+                if entity.entity_id not in seen:
+                    seen.add(entity.entity_id)
+                    candidates.append(entity)
         return candidates
 
     def _may_explore_entity(self, actor_id: str, entity: Any) -> bool:
@@ -1139,35 +1076,20 @@ class ContextConstructionEngine:
         planner ever picked it, so those names are deliberately excluded
         here rather than offered as if they were real actions.
 
-        Resolves the grocery vertical's own bus when no bus was
-        explicitly injected (self._capability_bus) — the only vertical
-        this codebase has, same default every other single-vertical call
-        site (vertical_router.py) already uses. Returns () (silently,
-        same as every other _retrieve_* method's "nothing available"
-        case) if no vertical is registered at all.
+        Resolves the default vertical's bus (kernel/verticals.py) when no
+        bus was explicitly injected (self._capability_bus). Returns ()
+        (silently, same as every other _retrieve_* method's "nothing
+        available" case) if no vertical is registered at all.
 
-        Domain-scoped from there: ACTOR_NODE_CLASS is set on whichever
-        process is actually building this plan (actor_runtime.py's own
-        env, e.g. "robot" for a drone's dedicated Pod) — and since
-        api/routes/prompt.py's own forward-to-dedicated-Pod fix means a
-        robot actor's cognition now always runs THERE, not on the shared
-        central control plane, this env var reliably reflects the
-        CURRENT actor's own domain at the exact point this method runs.
-        A robot process only ever sees its own vehicle's + universal
-        names (ROBOT_VEHICLE_KIND, see below); every other process
-        (grocery/human actors, the shared cloud control plane) sees
-        everything except every robot-only name — see this module's own
-        _ROBOT_CAPABILITY_NAMES/_UNIVERSAL_CAPABILITY_NAMES comment for
-        why a real second VerticalRuntime wasn't needed to fix this.
+        Domain plugins can then narrow the list per actor
+        (kernel/extensions.py::capability_filters).
         """
         bus = self._capability_bus
         if bus is None:
             try:
-                from src.monkey_brain.kernel.domains.vertical_router import (
-                    resolve_vertical,
-                )
+                from src.monkey_brain.kernel.verticals import resolve_vertical
 
-                bus = resolve_vertical("grocery").bus
+                bus = resolve_vertical().bus
             except Exception:
                 return ()
 
@@ -1176,39 +1098,24 @@ class ContextConstructionEngine:
         # each capability's own optional .description class attribute
         # ("Name: description") when it has one, bare "Name" otherwise, so
         # plan-validation/step.action matching elsewhere (which compares
-        # against the bare name, e.g. robot.py's PX4 action classes'
-        # .name) is unaffected either way, since it never reads THIS
-        # tuple, only the plan the model returns. Confirmed live this was
-        # a real gap for the PX4 vertical specifically: a bare "Arm"/
-        # "Takeoff" name list gave the model no reason to think these were
-        # two required, ordered steps rather than one -- see robot.py's
-        # ArmCapability/TakeoffCapability .description text for the fix.
+        # against the bare name) is unaffected either way, since it never
+        # reads THIS tuple, only the plan the model returns.
         def _describe(n: str) -> str:
             description = getattr(bus.discover(n), "description", None)
             return f"{n}: {description}" if description else n
 
-        names = (name for name in bus.names() if callable(getattr(bus.discover(name), "handle", None)))
-        if os.environ.get("ACTOR_NODE_CLASS", "cloud") == "robot":
-            # ROBOT_VEHICLE_KIND (deploy/k8s/drone-actor-deployment.yaml=
-            # "px4", deploy/k8s/ground-actor-deployment.yaml="nav2")
-            # narrows to exactly that vehicle's own capability names --
-            # confirmed live a ground robot's planner otherwise still saw
-            # (and occasionally picked) the PX4-only Arm/Takeoff/Waypoint/
-            # Land names, since node_class=robot alone doesn't say which
-            # vehicle. Unset/unrecognized falls back to the old combined
-            # _ROBOT_CAPABILITY_NAMES (both vehicles' names) -- the exact
-            # prior behavior, so a robot-class deployment that hasn't been
-            # updated with this env var yet never loses a capability it
-            # already had.
-            vehicle_kind = os.environ.get("ROBOT_VEHICLE_KIND", "").strip().lower()
-            robot_names = {
-                "px4": _PX4_CAPABILITY_NAMES,
-                "nav2": _NAV2_CAPABILITY_NAMES,
-            }.get(vehicle_kind, _ROBOT_CAPABILITY_NAMES)
-            return tuple(
-                _describe(n) for n in names if n in robot_names or n in _SELF_CONTAINED_UNIVERSAL_CAPABILITY_NAMES
-            )
-        return tuple(_describe(n) for n in names if n not in _ROBOT_CAPABILITY_NAMES)
+        names = [name for name in bus.names() if callable(getattr(bus.discover(name), "handle", None))]
+        # Domain plugins narrow what this actor's planner is offered (e.g.
+        # the robotics domain shows a robot only its own vehicle's
+        # capabilities, and hides robot capabilities from everyone else).
+        from src.monkey_brain.kernel.extensions import extensions
+
+        for narrow in extensions.capability_filters:
+            try:
+                names = list(narrow(names))
+            except Exception:
+                logger.debug("capability filter %r failed", narrow, exc_info=True)
+        return tuple(_describe(n) for n in names)
 
     def _retrieve_actor_profile(self, actor_id: str) -> Any:
         if self._planetary_runtime is None:
@@ -1338,18 +1245,29 @@ class ContextConstructionEngine:
                     merged[key] = value
         return merged
 
-    def _retrieve_commerce_network(
-        self, goal_text: str, activated_society_ids: set[str] | None = None
-    ) -> tuple[dict[str, Any], ...]:
-        network = getattr(self._planetary_runtime, "commerce_network", None)
-        if network is None:
-            return ()
-        society_id = next(iter(activated_society_ids or ()), "")
-        federation_id = ""
-        if society_id and hasattr(self._planetary_runtime, "federation_manager"):
-            federations = self._planetary_runtime.federation_manager.federations_for_society(society_id)
-            federation_id = federations[0].federation_id if federations else ""
-        return network.planning_facts(goal_text, society_id, federation_id)
+    def _retrieve_domain_metadata(
+        self, actor_id: str, goal_text: str, activated_society_ids: set[str] | None = None
+    ) -> dict[str, Any]:
+        """Extra planning metadata from domain plugins
+        (kernel/extensions.py::planning_metadata_providers) -- e.g. the
+        commerce domain adds "commerce_network_facts"."""
+        from src.monkey_brain.kernel.extensions import extensions
+
+        merged: dict[str, Any] = {}
+        sections: list[tuple[str, Any]] = []
+        for provide in extensions.planning_metadata_providers:
+            try:
+                provided = dict(provide(self._planetary_runtime, actor_id, goal_text, set(activated_society_ids or ())) or {})
+            except Exception:
+                logger.debug("planning metadata provider %r failed", provide, exc_info=True)
+                continue
+            # "domain_prompt_sections" accumulates across providers -- the
+            # planner renders each (title, lines) pair (llm_planner.py).
+            sections.extend(provided.pop("domain_prompt_sections", ()) or ())
+            merged.update(provided)
+        if sections:
+            merged["domain_prompt_sections"] = sections
+        return merged
 
     # ── Ranking / Deduplication ───────────────────────────────────────
 

@@ -24,3 +24,18 @@ def set_host_state(state: Any) -> None:
 
 def get_host_state() -> Any:
     return _host_state
+
+
+# The process's PlanetaryRuntime, for code that runs outside a request
+# (background timers, domain callbacks) and so has no app.state to read it
+# from. Set by Kernel._phase_planetary, cleared by PlanetaryRuntime.shutdown.
+_planetary_runtime: Any = None
+
+
+def set_planetary_runtime(pr: Any) -> None:
+    global _planetary_runtime
+    _planetary_runtime = pr
+
+
+def get_planetary_runtime() -> Any:
+    return _planetary_runtime

@@ -288,28 +288,22 @@ class ActionExecutor:
                 resolved_negotiation = pending_negotiation
         waiting_for_negotiation = False
 
-        # Payment confirmation pause-resume (mirrors resolved_approval/
-        # resolved_negotiation immediately above): a real, two-phase
-        # PaymentProvider (kernel/domains/payment_provider.py — e.g.
-        # RazorpayUPIProvider) can't hold funds synchronously, since the
-        # payer has to approve in their own UPI app first. A capability
-        # that called reserve() and got back PENDING_AUTHORIZATION opts a
-        # step into this pause by returning
-        # {"requires_payment_confirmation": True, "reservation_id": ...,
-        # "provider_name": ..., ...} in its own result dict, the same
-        # capability-driven opt-in shape requires_approval already uses —
-        # ActionExecutor never calls reserve()/capture() itself, same as
-        # it never decides what "approval" or "negotiation" mean.
-        resolved_payment = None
-        if execution_id:
-            from src.monkey_brain.kernel.pipeline.payment_store import (
-                load_pending_payment,
-            )
+        # Domain confirmation pauses (pipeline/confirmation_pauses.py), e.g.
+        # a payment waiting for the payer to approve in their own app:
+        # registered by domain plugins, mirroring resolved_approval/
+        # resolved_negotiation immediately above. A capability opts a step
+        # in by setting the kind's result_flag in its result dict, the same
+        # capability-driven shape requires_approval already uses --
+        # ActionExecutor never decides what the pause means.
+        from src.monkey_brain.kernel.pipeline.confirmation_pauses import confirmation_pauses
 
-            pending_payment = load_pending_payment(execution_id)
-            if pending_payment is not None and pending_payment.decided is not None:
-                resolved_payment = pending_payment
-        waiting_for_payment = False
+        resolved_pauses: list[tuple[Any, Any]] = []
+        if execution_id:
+            for pause in confirmation_pauses():
+                record = pause.load_resolved(execution_id)
+                if record is not None:
+                    resolved_pauses.append((pause, record))
+        waiting_pauses: set[str] = set()
 
         scheduled_indices: set[int] = set()
         while True:
@@ -391,22 +385,17 @@ class ActionExecutor:
                     ):
                         context["negotiation_decision"] = resolved_negotiation.decided
 
-                    if (
-                        resolved_payment is not None
-                        and action.step_index >= 0
-                        and action.step_index == resolved_payment.step_index
-                        and isinstance(context, dict)
-                    ):
-                        # True = captured (webhook confirmed the payer
-                        # approved and capture() succeeded), False = released/
-                        # failed/expired -- a resuming capability reads this
-                        # instead of calling reserve() again, same "commit
-                        # exactly what was already decided, never a freshly
-                        # recomputed candidate" contract approval_decision
-                        # gives above.
-                        context["payment_decision"] = resolved_payment.decided
-                        context["payment_reservation_id"] = resolved_payment.reservation_id
-                        context["payment_provider_name"] = resolved_payment.provider_name
+                    for pause, record in resolved_pauses:
+                        if (
+                            action.step_index >= 0
+                            and action.step_index == record.step_index
+                            and isinstance(context, dict)
+                        ):
+                            # The decision already made (e.g. payment captured
+                            # or released) -- a resuming capability reads it
+                            # instead of re-requesting, same "commit exactly
+                            # what was already decided" contract approval gives.
+                            context.update(pause.resume_context(record))
 
                     # PROPOSE -> CHECK, before the capability is ever invoked
                     # (the actual architectural fix: no capability that
@@ -790,51 +779,33 @@ class ActionExecutor:
                             )
                         waiting_for_human = True
 
-                    this_step_requires_payment_confirmation = isinstance(outcome.result, dict) and bool(
-                        outcome.result.get("requires_payment_confirmation")
-                    )
-                    if this_step_requires_payment_confirmation:
-                        # Same "only the FIRST pause in a given tick is
-                        # persisted as the resumable pending record" scope
-                        # boundary as requires_approval above (PendingPayment
-                        # is keyed one-per-execution_id, same as PendingApproval/
-                        # PendingNegotiation) -- every step's own real outcome
-                        # still appears in outcomes/actions below regardless.
-                        if not waiting_for_payment:
-                            from src.monkey_brain.kernel.pipeline.payment_store import (
-                                PendingPayment,
-                                save_pending_payment,
+                    requested_pauses = [
+                        pause
+                        for pause in confirmation_pauses()
+                        if isinstance(outcome.result, dict) and outcome.result.get(pause.result_flag)
+                    ]
+                    for pause in requested_pauses:
+                        # Same "only the FIRST pause of a kind in a given tick
+                        # is persisted as the resumable pending record" scope
+                        # boundary as requires_approval above (records are
+                        # keyed one-per-execution_id) -- every step's own real
+                        # outcome still appears in outcomes/actions below.
+                        if pause.name not in waiting_pauses:
+                            pause.save_pending(
+                                execution_id=execution_id or action.action_id,
+                                actor_id=(context.get("actor_id", "") if isinstance(context, dict) else ""),
+                                action=action,
+                                result=outcome.result,
+                                context=context,
                             )
-
-                            result = outcome.result
-                            save_pending_payment(
-                                PendingPayment(
-                                    execution_id=execution_id or action.action_id,
-                                    actor_id=(context.get("actor_id", "") if isinstance(context, dict) else ""),
-                                    step_index=action.step_index,
-                                    capability=action.capability,
-                                    action_id=action.action_id,
-                                    provider_name=result.get("provider_name", ""),
-                                    reservation_id=result.get("reservation_id", ""),
-                                    payer_ref=result.get("payer_ref", ""),
-                                    amount=float(result.get("amount", 0.0) or 0.0),
-                                    reserve_idempotency_key=result.get("reserve_idempotency_key", ""),
-                                    status=result.get("status", "pending_authorization"),
-                                    reason=result.get("reason", ""),
-                                    correlation_id=action.correlation_id,
-                                    causation_id=action.causation_id,
-                                    original_question=(
-                                        context.get("question", "") if isinstance(context, dict) else ""
-                                    ),
-                                )
-                            )
-                        waiting_for_payment = True
+                        waiting_pauses.add(pause.name)
+                    this_step_requires_confirmation = bool(requested_pauses)
 
                     if (
                         outcome.success
                         and action.step_index >= 0
                         and not this_step_requires_approval
-                        and not this_step_requires_payment_confirmation
+                        and not this_step_requires_confirmation
                     ):
                         succeeded_step_indices.add(action.step_index)
                         if execution_id:
@@ -907,7 +878,7 @@ class ActionExecutor:
         failure_count = sum(1 for o in outcomes if not o.success)
 
         goal_achieved = (
-            failure_count == 0 and not waiting_for_human and not waiting_for_negotiation and not waiting_for_payment
+            failure_count == 0 and not waiting_for_human and not waiting_for_negotiation and not waiting_pauses
         )
 
         paused_status = (
@@ -916,7 +887,7 @@ class ActionExecutor:
             else (
                 "waiting_for_negotiation"
                 if waiting_for_negotiation
-                else ("waiting_for_payment_confirmation" if waiting_for_payment else None)
+                else next((p.waiting_status for p in confirmation_pauses() if p.name in waiting_pauses), None)
             )
         )
         _obs.gauge("pipeline.execution_latency_ms", total_ms)

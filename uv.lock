@@ -670,6 +670,138 @@ wheels = [
 ]
 
 [[package]]
+name = "cognitiveos-core"
+version = "1.0.5"
+source = { editable = "." }
+dependencies = [
+    { name = "aiohttp" },
+    { name = "bcrypt" },
+    { name = "boto3" },
+    { name = "fastapi" },
+    { name = "httpx" },
+    { name = "influxdb-client" },
+    { name = "lemon" },
+    { name = "moss" },
+    { name = "motor" },
+    { name = "nats-py" },
+    { name = "neo4j" },
+    { name = "networkx" },
+    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
+    { name = "numpy", version = "2.5.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
+    { name = "opentelemetry-exporter-otlp-proto-http" },
+    { name = "opentelemetry-sdk" },
+    { name = "paho-mqtt" },
+    { name = "phart", version = "1.1.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.14'" },
+    { name = "phart", version = "2.1.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.14'" },
+    { name = "pydantic" },
+    { name = "pydantic-settings" },
+    { name = "pymongo" },
+    { name = "python-jose", extra = ["cryptography"] },
+    { name = "python-multipart" },
+    { name = "pyyaml" },
+    { name = "redis" },
+    { name = "rich" },
+    { name = "scipy", version = "1.17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
+    { name = "scipy", version = "1.18.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
+    { name = "torch", version = "2.14.0", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'darwin'" },
+    { name = "torch", version = "2.14.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform != 'darwin'" },
+    { name = "transformers" },
+    { name = "typer" },
+    { name = "uvicorn", extra = ["standard"] },
+    { name = "watchfiles" },
+]
+
+[package.optional-dependencies]
+enterprise = [
+    { name = "elasticsearch", extra = ["async"] },
+    { name = "mem0ai" },
+    { name = "pyspark" },
+    { name = "spacy" },
+]
+livekit = [
+    { name = "livekit" },
+    { name = "livekit-api" },
+    { name = "openai-whisper" },
+    { name = "resampy" },
+]
+vision = [
+    { name = "kornia" },
+    { name = "opencv-python" },
+    { name = "pillow" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "bandit" },
+    { name = "mypy" },
+    { name = "pre-commit" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-cov" },
+    { name = "pytest-timeout" },
+    { name = "ruff" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "aiohttp" },
+    { name = "bcrypt" },
+    { name = "boto3" },
+    { name = "elasticsearch", extras = ["async"], marker = "extra == 'enterprise'" },
+    { name = "fastapi" },
+    { name = "httpx" },
+    { name = "influxdb-client" },
+    { name = "kornia", marker = "extra == 'vision'" },
+    { name = "lemon" },
+    { name = "livekit", marker = "extra == 'livekit'" },
+    { name = "livekit-api", marker = "extra == 'livekit'" },
+    { name = "mem0ai", marker = "extra == 'enterprise'" },
+    { name = "moss", specifier = "==1.7.3" },
+    { name = "motor" },
+    { name = "nats-py" },
+    { name = "neo4j" },
+    { name = "networkx" },
+    { name = "numpy" },
+    { name = "openai-whisper", marker = "extra == 'livekit'" },
+    { name = "opencv-python", marker = "extra == 'vision'" },
+    { name = "opentelemetry-exporter-otlp-proto-http" },
+    { name = "opentelemetry-sdk" },
+    { name = "paho-mqtt" },
+    { name = "phart" },
+    { name = "pillow", marker = "extra == 'vision'" },
+    { name = "pydantic" },
+    { name = "pydantic-settings" },
+    { name = "pymongo" },
+    { name = "pyspark", marker = "extra == 'enterprise'" },
+    { name = "python-jose", extras = ["cryptography"] },
+    { name = "python-multipart" },
+    { name = "pyyaml" },
+    { name = "redis", specifier = ">=4.2.0" },
+    { name = "resampy", marker = "extra == 'livekit'" },
+    { name = "rich" },
+    { name = "scipy" },
+    { name = "spacy", marker = "extra == 'enterprise'" },
+    { name = "torch", specifier = ">=2.14.0", index = "https://download.pytorch.org/whl/cpu" },
+    { name = "transformers", specifier = ">=5.17.0" },
+    { name = "typer" },
+    { name = "uvicorn", extras = ["standard"] },
+    { name = "watchfiles" },
+]
+provides-extras = ["enterprise", "soma", "ros", "livekit", "vision"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "bandit" },
+    { name = "mypy" },
+    { name = "pre-commit" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-cov" },
+    { name = "pytest-timeout" },
+    { name = "ruff" },
+]
+
+[[package]]
 name = "colorama"
 version = "0.4.6"
 source = { registry = "https://pypi.org/simple" }
@@ -1923,138 +2055,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/25/dd/e62a707c422bf3326a81f6089b8c6735e25ccf3533338175fc1db87477e1/mem0ai-2.0.20.tar.gz", hash = "sha256:4366068a8cdeac170d15e7470340110e1daae70003166066529ea2a0a7f8b232", size = 250097, upload-time = "2026-09-02T13:19:31.319Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e8/5b/534928071342f88206755362cbf826f1d436d2b812bea1f8c357d70180dd/mem0ai-2.0.20-py3-none-any.whl", hash = "sha256:655103616fe70b67e0434f6725aad35269a071adcd1f61426553b10e0b1b076c", size = 345797, upload-time = "2026-09-02T13:19:29.621Z" },
-]
-
-[[package]]
-name = "monkeybrain-runtime"
-version = "1.0.5"
-source = { editable = "." }
-dependencies = [
-    { name = "aiohttp" },
-    { name = "bcrypt" },
-    { name = "boto3" },
-    { name = "fastapi" },
-    { name = "httpx" },
-    { name = "influxdb-client" },
-    { name = "lemon" },
-    { name = "moss" },
-    { name = "motor" },
-    { name = "nats-py" },
-    { name = "neo4j" },
-    { name = "networkx" },
-    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
-    { name = "numpy", version = "2.5.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
-    { name = "opentelemetry-exporter-otlp-proto-http" },
-    { name = "opentelemetry-sdk" },
-    { name = "paho-mqtt" },
-    { name = "phart", version = "1.1.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.14'" },
-    { name = "phart", version = "2.1.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.14'" },
-    { name = "pydantic" },
-    { name = "pydantic-settings" },
-    { name = "pymongo" },
-    { name = "python-jose", extra = ["cryptography"] },
-    { name = "python-multipart" },
-    { name = "pyyaml" },
-    { name = "redis" },
-    { name = "rich" },
-    { name = "scipy", version = "1.17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
-    { name = "scipy", version = "1.18.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
-    { name = "torch", version = "2.14.0", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'darwin'" },
-    { name = "torch", version = "2.14.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform != 'darwin'" },
-    { name = "transformers" },
-    { name = "typer" },
-    { name = "uvicorn", extra = ["standard"] },
-    { name = "watchfiles" },
-]
-
-[package.optional-dependencies]
-enterprise = [
-    { name = "elasticsearch", extra = ["async"] },
-    { name = "mem0ai" },
-    { name = "pyspark" },
-    { name = "spacy" },
-]
-livekit = [
-    { name = "livekit" },
-    { name = "livekit-api" },
-    { name = "openai-whisper" },
-    { name = "resampy" },
-]
-vision = [
-    { name = "kornia" },
-    { name = "opencv-python" },
-    { name = "pillow" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "bandit" },
-    { name = "mypy" },
-    { name = "pre-commit" },
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "pytest-cov" },
-    { name = "pytest-timeout" },
-    { name = "ruff" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "aiohttp" },
-    { name = "bcrypt" },
-    { name = "boto3" },
-    { name = "elasticsearch", extras = ["async"], marker = "extra == 'enterprise'" },
-    { name = "fastapi" },
-    { name = "httpx" },
-    { name = "influxdb-client" },
-    { name = "kornia", marker = "extra == 'vision'" },
-    { name = "lemon" },
-    { name = "livekit", marker = "extra == 'livekit'" },
-    { name = "livekit-api", marker = "extra == 'livekit'" },
-    { name = "mem0ai", marker = "extra == 'enterprise'" },
-    { name = "moss", specifier = "==1.7.3" },
-    { name = "motor" },
-    { name = "nats-py" },
-    { name = "neo4j" },
-    { name = "networkx" },
-    { name = "numpy" },
-    { name = "openai-whisper", marker = "extra == 'livekit'" },
-    { name = "opencv-python", marker = "extra == 'vision'" },
-    { name = "opentelemetry-exporter-otlp-proto-http" },
-    { name = "opentelemetry-sdk" },
-    { name = "paho-mqtt" },
-    { name = "phart" },
-    { name = "pillow", marker = "extra == 'vision'" },
-    { name = "pydantic" },
-    { name = "pydantic-settings" },
-    { name = "pymongo" },
-    { name = "pyspark", marker = "extra == 'enterprise'" },
-    { name = "python-jose", extras = ["cryptography"] },
-    { name = "python-multipart" },
-    { name = "pyyaml" },
-    { name = "redis", specifier = ">=4.2.0" },
-    { name = "resampy", marker = "extra == 'livekit'" },
-    { name = "rich" },
-    { name = "scipy" },
-    { name = "spacy", marker = "extra == 'enterprise'" },
-    { name = "torch", specifier = ">=2.14.0", index = "https://download.pytorch.org/whl/cpu" },
-    { name = "transformers", specifier = ">=5.17.0" },
-    { name = "typer" },
-    { name = "uvicorn", extras = ["standard"] },
-    { name = "watchfiles" },
-]
-provides-extras = ["enterprise", "soma", "ros", "livekit", "vision"]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "bandit" },
-    { name = "mypy" },
-    { name = "pre-commit" },
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "pytest-cov" },
-    { name = "pytest-timeout" },
-    { name = "ruff" },
 ]
 
 [[package]]

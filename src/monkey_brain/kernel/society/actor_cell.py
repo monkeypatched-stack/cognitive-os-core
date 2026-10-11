@@ -38,7 +38,6 @@ from dataclasses import dataclass
 from typing import Any
 
 from src.monkey_brain.kernel.delegation import DelegationCredential
-from src.monkey_brain.kernel.edge.ros_integration import RosExecutionAdapter
 
 
 @dataclass
@@ -62,7 +61,7 @@ class ActorCell:
     runtime_state: Any
     """The ActorRuntimeState this Cell wraps (kernel/society/runtime.py).
     Typed Any for the same reason as `actor`."""
-    ros_adapter: RosExecutionAdapter | None = None
+    ros_adapter: Any = None  # a device adapter (actor repo), e.g. its RosExecutionAdapter
     """Actor-bound ROS execution adapter (kernel/edge/ros_integration.py),
     when this actor has one -- None for non-robot actors. Constructed via
     build_ros_execution_adapter(actor_id=self.actor_id, ...) so its
