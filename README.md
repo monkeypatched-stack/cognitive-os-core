@@ -5,13 +5,14 @@ predict → govern → execute → compare → learn), the society and planetary
 runtimes, actor contracts, and the platform services the other repos build on.
 It is a library. It runs neither the control plane nor any actor by itself.
 
-CognitiveOS is split across five repositories, checked out side by side:
+CognitiveOS is split across six repositories, checked out side by side:
 
 ```text
 Code/
 ├── cognitive-os-core/                    ← this repo: kernel, society, contracts
 ├── cognitive-os-control-plane/           Control API, scheduler, auth, gateway (Kong)
-├── cognitive-os-actor/                   Actor Runtime, domains, devices, domain API service
+├── cognitive-os-actor/                   the Actor Runtime (domain-free)
+├── cognitive-os-domains/                 domains, devices, domain API service
 ├── cognitive-os-ui/                      workspace UI and Living World Explorer
 └── coginitive-os-manufacturing/          manufacturing domain microservices
 ```

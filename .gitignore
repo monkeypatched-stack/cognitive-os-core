@@ -67,5 +67,5 @@ coverage.xml
 htmlcov/
 *.log
 
-# scripts/stack.sh runtime state (pids, logs, generated admin login)
+# cognitive-os-scripts/control-plane/stack.sh runtime state (pids, logs, generated admin login)
 .stack/

@@ -53,6 +53,22 @@ class Extensions:
     # CognitiveKernel reporting: () -> report object / knowledge publisher
     kernel_report_factory: Callable[[], Any] | None = None
     knowledge_publisher_factory: Callable[[], Any] | None = None
+    # Actor Runtime (cognitive-os-actor) lifecycle, for what a domain plugin
+    # binds to the one actor a runtime hosts (devices: ROS adapters, cameras).
+    # Each hook may return an awaitable. Boot hooks run once this runtime is
+    # registered as a node, before the actor is loaded:
+    #   (actor_runtime, node_class) -> None
+    actor_runtime_boot_hooks: list[Callable[[Any, Any], Any]] = field(default_factory=list)
+    # ... ready hooks once the actor is loaded here: (actor_runtime, planetary_runtime) -> None
+    actor_runtime_ready_hooks: list[Callable[[Any, Any], Any]] = field(default_factory=list)
+    # ... stop hooks on shutdown: (actor_runtime) -> None
+    actor_runtime_stop_hooks: list[Callable[[Any], Any]] = field(default_factory=list)
+    # Extra Actor Runtime HTTP endpoints: (get_runtime) -> fastapi.APIRouter
+    actor_runtime_routers: list[Callable[[Callable[[], Any]], Any]] = field(default_factory=list)
+    # The actor's question answering (/ask, /chat): () -> object with
+    # async handle({"context": {...}}) -> {"success", "answer", ...} and
+    # gather_facts(knowledge_graph, actor_id, question) -> list[str]
+    question_answerer_factory: Callable[[], Any] | None = None
 
 
 extensions = Extensions()
