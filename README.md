@@ -5,17 +5,18 @@ predict → govern → execute → compare → learn), the society and planetary
 runtimes, actor contracts, and the platform services the other repos build on.
 It is a library. It runs neither the control plane nor any actor by itself.
 
-CognitiveOS is split across four repositories, checked out side by side:
+CognitiveOS is split across five repositories, checked out side by side:
 
 ```text
 Code/
 ├── cognitive-os-core/                    ← this repo: kernel, society, contracts
-├── cognitive-os-control-plane/           Control API, scheduler, auth, gateway (Kong), UI
+├── cognitive-os-control-plane/           Control API, scheduler, auth, gateway (Kong)
 ├── cognitive-os-actor/                   Actor Runtime, domains, devices, domain API service
+├── cognitive-os-ui/                      workspace UI and Living World Explorer
 └── coginitive-os-manufacturing/          manufacturing domain microservices
 ```
 
-The other three depend on this repo. Locally they find it as the sibling
+The Python repos depend on this one. Locally they find it as the sibling
 folder `../cognitive-os-core` (their `tests/conftest.py`, `pyproject.toml`
 `[tool.uv.sources]`, and Docker `core` build context), or wherever
 `COGNITIVEOS_CORE_DIR` points.
