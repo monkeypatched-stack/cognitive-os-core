@@ -12,7 +12,13 @@ Code/
 ├── cognitive-os-core/                    ← this repo: kernel, society, contracts
 ├── cognitive-os-control-plane/           Control API, scheduler, auth, gateway (Kong)
 ├── cognitive-os-actor/                   the Actor Runtime (domain-free)
-├── cognitive-os-domains/                 domains, devices, domain API, manufacturing microservices
+├── cognitive-os-domains/                 intent library, domain packs, domain API
+├── cognitive-os-commerce/                one repo per actor type, each a domain plugin:
+├── cognitive-os-manufacturing/             commerce, manufacturing (+ microservices),
+├── cognitive-os-media/                     media (voice/video), and for robots the
+├── cognitive-os-robotics/                  robotics base with its kinds drone (PX4)
+├── cognitive-os-drone/                     and navigation (Nav2)
+├── cognitive-os-navigation/
 ├── cognitive-os-ui/                      workspace UI and Living World Explorer
 └── cognitive-os-scripts/                 deployment and operations scripts
 ```
