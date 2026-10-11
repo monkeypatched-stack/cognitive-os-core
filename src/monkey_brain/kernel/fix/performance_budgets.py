@@ -250,7 +250,7 @@ PERFORMANCE_BUDGETS = {
     # (~3067ms/actor) against a local Ollama backend. Because the cost is
     # per-actor and serial, this budget is intentionally per-actor, not a
     # flat cycle budget — multiply by live actor count for the expected
-    # total. See docs/adr/016-performance-gate9.md for the scaling risk
+    # total. See cognitive-os-docs/engineering/adr/016-performance-gate9.md for the scaling risk
     # this implies (actor_count * p95 approaching the 300s auto-tick
     # interval causes tick pile-up, observed live: "Previous planetary
     # tick still running, skipping this cycle").

@@ -199,7 +199,7 @@ def cmd_logs_actor(args: argparse.Namespace) -> int:
     captured however the deployment mechanism captures it — a K8s
     `kubectl logs` on that Pod, a systemd journal entry, a local file —
     remains the source of application-level log lines). See
-    docs/COGNITIVEOS_FINAL_ARCHITECTURE.md's Observability section."""
+    cognitive-os-docs/engineering/COGNITIVEOS_FINAL_ARCHITECTURE.md's Observability section."""
     lifecycle = _request("GET", f"/actors/{args.actor_id}/lifecycle")
     history = lifecycle.get("history", [])
     if not history:

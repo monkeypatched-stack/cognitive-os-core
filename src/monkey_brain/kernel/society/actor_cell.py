@@ -1,6 +1,6 @@
 """ActorCell — the formal Actor Cell boundary object.
 
-docs/ACTOR_CELL_ARCHITECTURE.md Section B found that "there is no Actor Cell
+cognitive-os-docs/engineering/ACTOR_CELL_ARCHITECTURE.md Section B found that "there is no Actor Cell
 object today" — what exists instead is a set of already-correctly-actor-
 scoped pieces (CognitiveActor's belief/KG/memory/context/cognitive runtime,
 ActorRuntimeState) with no single object formalizing "this is everything one

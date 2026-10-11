@@ -106,7 +106,7 @@ class Lemon:
         unconfigured. These three are the ones this build's own findings
         actually motivate — not a generic starter set:
           - planetary tick duration, thresholded off the real per-actor
-            SLA this session established (docs/adr/016-performance-gate9.md)
+            SLA this session established (cognitive-os-docs/engineering/adr/016-performance-gate9.md)
           - the same metric at a threshold close to the 300s auto-tick
             interval, i.e. the tick-pile-up risk that ADR-016/018 flagged
             and that was live-observed this session ("Previous planetary

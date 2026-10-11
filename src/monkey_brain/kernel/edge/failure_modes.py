@@ -126,7 +126,7 @@ _TABLE: dict[FailureMode, FailureClassification] = {
         "(kernel/edge/moss_retrieval.py); SittingFaceKnowledgeRetriever then has simply "
         "found no vector hits this cycle, same as an empty EmbeddingStore result",
         "Moss (an OPTIONAL, narrowed-scope retrieval backend -- see "
-        "docs/CLOUD_EDGE_ACTOR_ARCHITECTURE.md Section 18's MossDB scope decision) is never "
+        "cognitive-os-docs/engineering/CLOUD_EDGE_ACTOR_ARCHITECTURE.md Section 18's MossDB scope decision) is never "
         "on the default path and never authoritative for anything; its absence costs "
         "retrieval quality, never correctness or security",
     ),

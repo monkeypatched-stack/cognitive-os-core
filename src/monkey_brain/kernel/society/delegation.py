@@ -22,7 +22,7 @@ wire `DelegationRegistry.is_valid()`/`effective_delegated_permissions()`
 into any capability-authorization decision — that is exclusively
 kernel/delegation.py::verify_delegation_chain's job, via ensure_governed.
 Sharing the name "delegation" across these mechanisms is a known,
-accepted naming collision (see docs/CLOUD_EDGE_ACTOR_ARCHITECTURE.md's
+accepted naming collision (see cognitive-os-docs/engineering/CLOUD_EDGE_ACTOR_ARCHITECTURE.md's
 Society architecture review), not an indication they are interchangeable.
 
 In-memory dict-backed — delegations are few and lightweight per actor, so

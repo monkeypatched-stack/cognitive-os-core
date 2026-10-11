@@ -14,7 +14,7 @@ lives here.
 complete() is async so a caller's cancellation (asyncio.wait_for's timeout,
 e.g. CognitiveActor._cognitive_tick's 60s cap) can actually reach the
 in-flight network call, not just stop awaiting it. This matters concretely
-for Ollama: docs/adr/019-runtime-performance-audit.md's investigation
+for Ollama: cognitive-os-docs/engineering/adr/019-runtime-performance-audit.md's investigation
 confirmed live that a timed-out tick's LLM call kept running to
 completion in an orphaned background thread when it was wrapped in
 asyncio.to_thread — real work continuing to consume Ollama capacity

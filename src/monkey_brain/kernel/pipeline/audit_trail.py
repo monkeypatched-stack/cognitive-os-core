@@ -1,7 +1,7 @@
 """Durable, execution_id-correlated audit trail — a thin wrapper over
 TimelineStore (kernel/timeline/store.py), not a new persistence system.
 
-Production Hardening audit (docs/adr/020-production-hardening-audit.md)
+Production Hardening audit (cognitive-os-docs/engineering/adr/020-production-hardening-audit.md)
 found two existing "audit" systems, both broken/disabled by default:
 kernel/audit.py's hash-chained AuditLog (in-memory only in practice) and
 introspection/audit.py's @audited decorator (Mongo sink off unless

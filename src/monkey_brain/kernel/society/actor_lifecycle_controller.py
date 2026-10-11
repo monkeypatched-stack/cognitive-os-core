@@ -173,7 +173,7 @@ class ActorLifecycleController:
         background loop's sweep (PlanetaryRuntime._actor_lifecycle_
         reconciliation_loop). Does not discover actor_ids that only have
         a desired-state record but were never registered (see module
-        docstring / docs/ACTOR_LIFECYCLE.md's Known Limitations) — a
+        docstring / cognitive-os-docs/engineering/ACTOR_LIFECYCLE.md's Known Limitations) — a
         direct reconcile(actor_id) call still reports skipped_unknown_actor
         correctly for that case."""
         results: list[ReconciliationResult] = []
@@ -802,7 +802,7 @@ class ActorLifecycleController:
         execution_checkpoint_store.py are keyed by execution_id, not
         actor_id, so there is no general "list every outstanding
         commitment for this actor" query in the current architecture —
-        documented as a known limitation (docs/ACTOR_LIFECYCLE.md), not
+        documented as a known limitation (cognitive-os-docs/engineering/ACTOR_LIFECYCLE.md), not
         silently ignored. What IS checked: whether this actor's own last
         tick result shows an unresolved requires_negotiation action, the
         one signal already resident on ActorRuntimeState with no extra

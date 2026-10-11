@@ -96,7 +96,7 @@ async def run_actor_tick(actor_id: str, pr: Any, state: Any) -> dict[str, Any]:
     except asyncio.TimeoutError:
         raise HTTPException(
             status_code=504,
-            detail=f"Actor {actor_id} tick timed out after 30s (LLM planner latency — see docs/adr/016-performance-gate9.md)",
+            detail=f"Actor {actor_id} tick timed out after 30s (LLM planner latency — see cognitive-os-docs/engineering/adr/016-performance-gate9.md)",
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Execute failed: {e}")

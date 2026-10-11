@@ -878,7 +878,7 @@ class CognitiveActor(Entity):
         # update_goal/record_learning/decay_and_prune/etc.), so a delta
         # here is a real, not assumed, signal. Captured before any stage
         # runs; this was previously hardcoded True regardless of outcome
-        # (see docs/adr/019-runtime-performance-audit.md's finding).
+        # (see cognitive-os-docs/engineering/adr/019-runtime-performance-audit.md's finding).
         belief_version_before = state.belief.version
         # Planetary Narrative: one real id for this whole tick, generated
         # here (before any stage runs) so every stage/record writer that

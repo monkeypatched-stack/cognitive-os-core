@@ -305,8 +305,8 @@ class _FakePresence:
 
 
 class TestOccupantTicksRunConcurrently:
-    """Society architecture review, Phase 4: docs/adr/016-performance-gate9.md
-    and docs/adr/019-runtime-performance-audit.md found (and measured live,
+    """Society architecture review, Phase 4: cognitive-os-docs/engineering/adr/016-performance-gate9.md
+    and cognitive-os-docs/engineering/adr/019-runtime-performance-audit.md found (and measured live,
     30+s for 10 actors) that GeographicEntityRuntime.tick() awaited each
     present actor's LLM-backed cognitive tick SERIALLY. The current source
     (runtime.py:419-425) already awaits every occupant via asyncio.gather(),

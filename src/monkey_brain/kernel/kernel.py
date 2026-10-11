@@ -600,7 +600,7 @@ class Kernel:
         from src.monkey_brain.persistence.mem0_adapter import Mem0Resource
 
         # Mem0 is not configured in this deployment, so this resource never
-        # connects — that's expected, not a bug (docs/examples.md documents
+        # connects — that's expected, not a bug (cognitive-os-docs/engineering/examples.md documents
         # the resulting /health "mem0": "disconnected" as a real, non-fatal
         # degraded dependency; it's not in the required-subsystem set).
         # Registered anyway (rather than skipped) so /health has something

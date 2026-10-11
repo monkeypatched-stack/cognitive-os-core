@@ -107,7 +107,7 @@ class CircuitBreaker:
         by an enclosing asyncio.wait_for/task cancellation the whole way
         down to the socket operation, instead of running inside an
         asyncio.to_thread wrapper that a timeout can stop *waiting* on
-        but never actually stop (docs/adr/019-runtime-performance-audit.md's
+        but never actually stop (cognitive-os-docs/engineering/adr/019-runtime-performance-audit.md's
         Warehouse Worker investigation confirmed this live: a cancelled
         tick's own retry-loop output kept appearing in the log well after
         the tick had already been reported as timed out)."""

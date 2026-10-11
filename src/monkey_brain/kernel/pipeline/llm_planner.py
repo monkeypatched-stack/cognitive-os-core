@@ -33,7 +33,7 @@ from src.monkey_brain.kernel.pipeline.llm_plan_cache import (
 # error_recovery.py) but was only ever re-exported, never instantiated or
 # called anywhere in the codebase — confirmed via grep. This is the real
 # call site it belongs on: the per-actor LLM backend call this session's
-# Gate 9 findings (docs/adr/016-performance-gate9.md) already identified
+# Gate 9 findings (cognitive-os-docs/engineering/adr/016-performance-gate9.md) already identified
 # as the dominant, serial, per-actor cost. Without this, a genuinely down
 # or hanging backend makes every actor individually discover that the
 # slow way (each one waits out its own 30s SocietyRuntime.tick_one_actor

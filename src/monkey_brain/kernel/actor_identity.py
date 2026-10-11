@@ -1,6 +1,6 @@
 """Per-Actor Cell identity — layered on top of the existing SPIFFE/SPIRE
 process identity and the existing Portable Delegation machinery
-(kernel/delegation.py), per docs/ACTOR_CELL_ARCHITECTURE.md Section J.
+(kernel/delegation.py), per cognitive-os-docs/engineering/ACTOR_CELL_ARCHITECTURE.md Section J.
 
 Problem this closes: kernel/workload_identity.py's WorkloadIdentityProvider
 issues one SVID per PROCESS, never per actor. The two production call sites

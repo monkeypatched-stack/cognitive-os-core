@@ -17,8 +17,8 @@ edge deployment.
 For a real edge/device/robot deployment of the actual governed
 CognitiveActor — the SAME Actor abstraction used in the cloud, with real
 belief, capabilities, and TransitionGate-enforced authority — use
-src/monkey_brain/actor_runtime.py instead (docs/ACTOR_ARTIFACT.md,
-docs/CLOUD_EDGE_ACTOR_ARCHITECTURE.md). That module boots a real
+src/monkey_brain/actor_runtime.py instead (cognitive-os-docs/engineering/ACTOR_ARTIFACT.md,
+cognitive-os-docs/engineering/CLOUD_EDGE_ACTOR_ARCHITECTURE.md). That module boots a real
 PlanetaryRuntime-backed Actor Runtime; this one boots the standalone
 EdgeActor prototype described above.
 

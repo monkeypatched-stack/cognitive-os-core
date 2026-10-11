@@ -521,7 +521,7 @@ class CognitiveRuntime:
         # context_engine.build() runs, actually skips the real grounding
         # work for a plan that was always going to be empty regardless --
         # measured live at ~1.4-2.2s/actor wasted on exactly this case
-        # (docs/adr/019-runtime-performance-audit.md's "6 actors with no
+        # (cognitive-os-docs/engineering/adr/019-runtime-performance-audit.md's "6 actors with no
         # goal set" finding). Only changes which branch below runs, not
         # what either existing branch does.
         has_goal = goal is not None and bool(getattr(goal, "name", ""))
@@ -536,7 +536,7 @@ class CognitiveRuntime:
         # engine, no persisted plan, a different goal, a hard
         # consecutive-skip cap, or any error in the check itself all
         # fall through to a real replan, unchanged from before this
-        # existed. See docs/adr/019-runtime-performance-audit.md's
+        # existed. See cognitive-os-docs/engineering/adr/019-runtime-performance-audit.md's
         # "incremental scheduling" recommendation.
         #
         # Goal-scoped (Cross-Goal Plan Contamination fix): current_record

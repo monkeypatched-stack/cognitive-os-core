@@ -68,7 +68,7 @@ class EdgeLocalStore:
     """Thread-safe, single-file SQLite-backed cache + execution-state
     store. One instance per Actor Runtime process, matching the existing
     one-actor-per-process precedent (ACTOR_NODE_CAPACITY=1 for edge/
-    device/robot nodes -- docs/CLOUD_EDGE_ACTOR_ARCHITECTURE.md)."""
+    device/robot nodes -- cognitive-os-docs/engineering/CLOUD_EDGE_ACTOR_ARCHITECTURE.md)."""
 
     def __init__(self, db_path: str | None = None) -> None:
         self._db_path = db_path or os.environ.get("EDGE_LOCAL_STORE_PATH", _DEFAULT_DB_PATH)

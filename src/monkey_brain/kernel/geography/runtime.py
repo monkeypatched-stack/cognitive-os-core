@@ -379,8 +379,8 @@ class GeographicEntityRuntime:
         # tick every Actor physically present at this entity, and
         # reconcile its temporary memberships.
         #
-        # Performance (docs/adr/016-performance-gate9.md,
-        # docs/adr/019-runtime-performance-audit.md): this was previously
+        # Performance (cognitive-os-docs/engineering/adr/016-performance-gate9.md,
+        # cognitive-os-docs/engineering/adr/019-runtime-performance-audit.md): this was previously
         # a serial `for occupant_id in ...: await self._actor_ticker(...)`
         # loop -- each actor's own LLM-backed cognitive tick had to fully
         # finish before the next actor's could even start, turning N

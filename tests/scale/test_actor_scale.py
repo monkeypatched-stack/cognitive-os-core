@@ -21,7 +21,7 @@ everything" pattern for context events (_save_context(), wired via
 set_on_publish). Confirmed live: 200 actors took 222s and was still
 climbing before the fix; 10,000 actors would have been on the order of
 days. Both are now fixed to O(1)-per-call incremental writes (see
-docs/adr/011-actor-registration-on2-fix.md) — the numbers below are the
+cognitive-os-docs/engineering/adr/011-actor-registration-on2-fix.md) — the numbers below are the
 proof.
 
 Higher tiers (10k, 100k) are skipped by default (CI/local dev runs should

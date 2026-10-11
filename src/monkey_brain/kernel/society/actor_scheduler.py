@@ -32,7 +32,7 @@ work closed everywhere else. Rather than build the real, integrated
 scheduler as a thin wrapper around a disconnected, unpersisted prototype,
 this module reuses its GOOD IDEAS (a node-class enum, explicit
 capacity/available-capacity, capability-based filtering) as fresh,
-Redis-backed, PlanetaryRuntime-integrated code. See docs/ACTOR_SCHEDULER.md
+Redis-backed, PlanetaryRuntime-integrated code. See cognitive-os-docs/engineering/ACTOR_SCHEDULER.md
 for the full current-state assessment.
 
 Algorithm (Section 9): deterministic, explainable, reproducible. No ML,

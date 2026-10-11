@@ -1,5 +1,5 @@
 """Moss (docs.usemoss.dev / PyPI `moss`) as an OPTIONAL semantic-retrieval
-backend for the edge — narrowed scope, see docs/CLOUD_EDGE_ACTOR_ARCHITECTURE.md
+backend for the edge — narrowed scope, see cognitive-os-docs/engineering/CLOUD_EDGE_ACTOR_ARCHITECTURE.md
 Section 18's "MossDB scope decision" note for the full reasoning.
 
 Moss was originally proposed as the general edge persistence substrate

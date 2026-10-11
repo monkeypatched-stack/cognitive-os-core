@@ -207,7 +207,7 @@ class ActorRegistryEntry:
     node_id: str
     updated_at: float
     artifact_version: str = ""
-    """Actor Artifact model (docs/ACTOR_ARTIFACT.md): the operator-supplied
+    """Actor Artifact model (cognitive-os-docs/engineering/ACTOR_ARTIFACT.md): the operator-supplied
     version of whatever built the process currently reporting this
     record — e.g. "1.4". "" for any record written before this field
     existed, or by a process that never set ACTOR_ARTIFACT_VERSION —
@@ -5242,7 +5242,7 @@ return new_count
         ("A planetary tick is already running") on ANY overlap with the
         background auto-tick loop's cycle() sweep (_auto_tick_loop, every
         5 minutes) — which ticks every active actor SEQUENTIALLY (see
-        docs/adr/016-performance-gate9.md) and holds this exact
+        cognitive-os-docs/engineering/adr/016-performance-gate9.md) and holds this exact
         self._tick_lock for the WHOLE sweep, easily minutes long with more
         than a handful of actors. self._tick_lock is a plain asyncio.Lock
         — awaiting its own .acquire() already queues correctly and safely
@@ -6266,7 +6266,7 @@ return new_count
         ).tick()
         # Includes every actor's own tick time -- GeographicEntityRuntime
         # awaits each present actor's ticker serially (see
-        # docs/adr/016-performance-gate9.md), not alongside this call.
+        # cognitive-os-docs/engineering/adr/016-performance-gate9.md), not alongside this call.
         scheduler_ms = (time.perf_counter() - _scheduler_started) * 1000
 
         actors_observed += geo_result.actors_ticked_total
@@ -6533,8 +6533,8 @@ return new_count
                 # operator can guarantee no OTHER node could possibly also
                 # be ticking this same actor_id right now (e.g. a genuine
                 # one-actor-per-process edge deployment) -- default OFF,
-                # see docs/CLOUD_EDGE_ACTOR_ARCHITECTURE.md and
-                # docs/HORIZONTAL_SCHEDULER_SCALING.md for exactly when
+                # see cognitive-os-docs/engineering/CLOUD_EDGE_ACTOR_ARCHITECTURE.md and
+                # cognitive-os-docs/engineering/HORIZONTAL_SCHEDULER_SCALING.md for exactly when
                 # this is and isn't safe to enable.
                 logger.warning(
                     "Actor lease check failed for %r (%s) — "

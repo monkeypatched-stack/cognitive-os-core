@@ -389,7 +389,7 @@ class SocietyRuntime:
                     lambda question: {
                         "knowledge_graph": self._knowledge_graph,
                         "actor_id": entity_id,
-                        # Actor Cell Architecture (docs/ACTOR_CELL_ARCHITECTURE.md):
+                        # Actor Cell Architecture (cognitive-os-docs/engineering/ACTOR_CELL_ARCHITECTURE.md):
                         # CognitiveActor already constructs its OWN per-actor
                         # KnowledgeGraph (self._knowledge_graph on that class,
                         # KnowledgeGraph(person_id=entity_id)) but nothing ever
@@ -467,7 +467,7 @@ class SocietyRuntime:
         with self._actors_lock:
             self._actors[profile.identity.actor_id] = state
 
-        # Actor Cell (docs/ACTOR_CELL_ARCHITECTURE.md Section B/O): a
+        # Actor Cell (cognitive-os-docs/engineering/ACTOR_CELL_ARCHITECTURE.md Section B/O): a
         # best-effort formal boundary object -- never gates registration
         # itself (an actor that already exists must still register even if
         # minting fails for some environmental reason). The REAL,

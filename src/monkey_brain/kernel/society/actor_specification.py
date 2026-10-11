@@ -94,7 +94,7 @@ class ActorSpecification:
     Actor should be placed on, bypassing the Scheduler's own ranking
     (same semantics as actor_runtime.py's ACTOR_CLAIM_PLACEMENT, exposed
     here as a declarative field instead of a runtime env var). "" means
-    "let the Scheduler decide" (docs/ACTOR_SCHEDULER.md's normal
+    "let the Scheduler decide" (cognitive-os-docs/engineering/ACTOR_SCHEDULER.md's normal
     filter-rank-select path)."""
     capacity_hint: int = 1
     """spec.resources.capacity -- informational sizing hint recorded on

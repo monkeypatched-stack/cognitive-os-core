@@ -68,7 +68,7 @@ dependencies = [
     # Edge semantic-retrieval backend (kernel/edge/moss_retrieval.py). Moss
     # (docs.usemoss.dev) is a cloud-backed semantic-search SaaS -- NOT the
     # edge persistence substrate (that remains kernel/edge/local_store.py's
-    # SQLite backend, unchanged; see docs/CLOUD_EDGE_ACTOR_ARCHITECTURE.md
+    # SQLite backend, unchanged; see cognitive-os-docs/engineering/CLOUD_EDGE_ACTOR_ARCHITECTURE.md
     # Section 18's "MossDB scope decision"). The package itself is always
     # installed; moss_retrieval.py's own MOSS_PROJECT_ID/MOSS_PROJECT_KEY
     # check is what actually gates whether it's used at runtime -- this is
@@ -139,7 +139,7 @@ vision = ["kornia", "opencv-python", "Pillow"]
 monkeybrain = "monkey_brain.cli.main:main"
 monkeybrain-status = "install_agentos:status_main"
 monkeypatch = "repl.__main__:main"
-# Declarative control CLI (docs/COGNITIVEOS_FINAL_ARCHITECTURE.md) --
+# Declarative control CLI (cognitive-os-docs/engineering/COGNITIVEOS_FINAL_ARCHITECTURE.md) --
 # `cogctl apply -f actor.yaml`, `cogctl get actors`, etc. A pure HTTP
 # client against the Control API; never starts an Actor process itself.
 cogctl = "monkey_brain.cogctl:main"
