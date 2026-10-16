@@ -395,6 +395,10 @@ def require_permission(permission: str):
                 # to evaluate a dynamic rule — never request-supplied,
                 # only ever what the verified token itself carries.
                 request.state.jwt_attributes = payload.get("attributes") or {}
+                # Same additive threading: the verified email claim, for
+                # routes that must name the user to another system (the
+                # learning actor's requested_by is an LMS user id = email).
+                request.state.jwt_email = payload.get("email") or None
                 user = payload.get("sub", "authenticated")
                 from src.monkey_brain.kernel.trusted_auth import (
                     bind_trusted_auth,
@@ -563,6 +567,10 @@ def require_self_or_permission(permission: str, id_param: str = "actor_id"):
                 }
                 request.state.jwt_permissions = granted
                 request.state.jwt_attributes = payload.get("attributes") or {}
+                # Same additive threading: the verified email claim, for
+                # routes that must name the user to another system (the
+                # learning actor's requested_by is an LMS user id = email).
+                request.state.jwt_email = payload.get("email") or None
                 user = payload.get("sub", "authenticated")
                 if user == target_id or permission in granted or not auth_on:
                     return user

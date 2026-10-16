@@ -105,6 +105,12 @@ from src.monkey_brain.kernel.society.actor_lifecycle_controller import (
 
 logger = logging.getLogger("agentos.planetary_runtime")
 
+# The planetary scheduler's own service principal and the governed action its
+# world dynamics run under (_governed_world_dynamics): OPA sees this identity and
+# action, so operators can block or high-risk it like any other action.
+PLANETARY_SCHEDULER_PRINCIPAL = "kernel:planetary-scheduler"
+WORLD_DYNAMICS_ACTION = "world.dynamics"
+
 StageFn = Callable[[Any], Awaitable[Any]]
 
 
@@ -6090,6 +6096,99 @@ return new_count
             # always holding the lock for its full worst-case TTL
             self._release_planetary_cycle_lock()
 
+    def _apply_world_dynamics(
+        self, perturbation_magnitude: float, perturbation_chance: float
+    ) -> tuple[list[dict[str, Any]], set[str], float, float]:
+        """The planetary cycle's own world writes: the simulated noise, the movement
+        it triggers, and folding queued perturbation reports into the world. Runs
+        only inside _governed_world_dynamics' commitment."""
+        _world_reconciliation_started = time.perf_counter()
+        perturbations = self._world_model.perturb(
+            magnitude=perturbation_magnitude,
+            event_chance=perturbation_chance,
+        )
+        if perturbations:
+            logger.info("World perturbed: %d changes", len(perturbations))
+
+        # Apply movement perturbations to actors based on the world model's perturbations.
+        # This simulates actors evacuating or moving due to environmental changes or other external factors.
+        movement_perturbations = self._movement_perturbation.perturb(event_chance=0.05)
+        if movement_perturbations:
+            logger.info(
+                "Movement perturbation: %d actor(s) evacuated",
+                len(movement_perturbations),
+            )
+            perturbations.extend(movement_perturbations)
+        world_reconciliation_ms = (time.perf_counter() - _world_reconciliation_started) * 1000
+
+        # World Perturbation Queue: reconcile every operator/actor-reported
+        # change queued since the last cycle (POST /planet/perturbations,
+        # ReportWorldPerturbationCapability) into the Global World State --
+        # additive to the simulated noise above, not a replacement for it
+        # (see kernel/society/perturbation_queue.py). Also feeds Deja Vu:
+        # any actor with a standing plan that references one of these
+        # entity_ids gets its reasoning replayed under the updated state.
+        _perturbation_queue_started = time.perf_counter()
+        touched_entity_ids: set[str] = set()
+        for queued in self._perturbation_queue.drain():
+            self._world_model.record_event(
+                WorldEvent(
+                    event_type=EventType.WORLD_UPDATE,
+                    entity_id=queued.entity_id,
+                    description=queued.description,
+                    attributes=dict(queued.attributes),
+                    source_actor_id=queued.source,
+                )
+            )
+            if queued.entity_id:
+                touched_entity_ids.add(queued.entity_id)
+        perturbation_queue_ms = (time.perf_counter() - _perturbation_queue_started) * 1000
+        return perturbations, touched_entity_ids, world_reconciliation_ms, perturbation_queue_ms
+
+    async def _governed_world_dynamics(
+        self, perturbation_magnitude: float, perturbation_chance: float
+    ) -> tuple[list[dict[str, Any]], set[str], float, float]:
+        """Apply the cycle's world dynamics through the full governed-mutation
+        pipeline (AUTH -> OPA AUTHZ -> approval artifact -> ledger -> audit), as the
+        planetary scheduler's own service principal. Before this the auto-tick wrote
+        to SharedWorld with no commitment at all, so outside insecure-dev mode every
+        tick died at "ungoverned state mutation: shared_world.perturb".
+
+        The scheduler identity is bound inside a dedicated task: a task copies the
+        ContextVars at creation, so neither the identity nor the commitment leaks
+        into the society ticks below, whose actors bind their own identities
+        (compile/actor_runtime.py binds one only when none is bound yet).
+
+        A denial (policy, missing idempotency/audit store, or a high-risk listing
+        that needs a human) skips the world dynamics for this cycle -- nothing is
+        drained from the perturbation queue, so reports wait for the next cycle --
+        and the cycle continues; it is never retried within the cycle."""
+        from src.monkey_brain.kernel.security_boundary import (
+            HumanApprovalRequired,
+            SecurityBoundaryDenied,
+            run_governed_mutation,
+        )
+        from src.monkey_brain.kernel.trusted_auth import bind_trusted_auth, evidence_for_service
+
+        async def governed() -> tuple[list[dict[str, Any]], set[str], float, float]:
+            bind_trusted_auth(evidence_for_service(PLANETARY_SCHEDULER_PRINCIPAL))
+            return await run_governed_mutation(
+                action=WORLD_DYNAMICS_ACTION,
+                resource="shared_world",
+                mutate=lambda: self._apply_world_dynamics(perturbation_magnitude, perturbation_chance),
+                extra={"cycle_number": self._cycle_count},
+            )
+
+        try:
+            return await asyncio.create_task(governed())
+        except HumanApprovalRequired as exc:
+            logger.warning("Planetary cycle %d: world dynamics await human approval (%s); skipped this cycle",
+                           self._cycle_count, exc.approval_id)
+        except SecurityBoundaryDenied as exc:
+            logger.warning("Planetary cycle %d: world dynamics denied at %s (%s); skipped this cycle",
+                           self._cycle_count, getattr(exc, "stage", "?"), exc)
+        return [], set(), 0.0, 0.0
+
     async def _run_cycle_with_timeout(self, timeout_seconds: float) -> PlanetaryCycleResult:
         """Run cycle with timeout protection."""
         try:
@@ -6164,47 +6263,9 @@ return new_count
             0.60,
             0.30 + min(world_signal_count, 10) * 0.02 + severity * 0.20,
         )
-        _world_reconciliation_started = time.perf_counter()
-        perturbations = self._world_model.perturb(
-            magnitude=perturbation_magnitude,
-            event_chance=perturbation_chance,
+        perturbations, touched_entity_ids, world_reconciliation_ms, perturbation_queue_ms = (
+            await self._governed_world_dynamics(perturbation_magnitude, perturbation_chance)
         )
-        if perturbations:
-            logger.info("World perturbed: %d changes", len(perturbations))
-
-        # Apply movement perturbations to actors based on the world model's perturbations.
-        # This simulates actors evacuating or moving due to environmental changes or other external factors.
-        movement_perturbations = self._movement_perturbation.perturb(event_chance=0.05)
-        if movement_perturbations:
-            logger.info(
-                "Movement perturbation: %d actor(s) evacuated",
-                len(movement_perturbations),
-            )
-            perturbations.extend(movement_perturbations)
-        world_reconciliation_ms = (time.perf_counter() - _world_reconciliation_started) * 1000
-
-        # World Perturbation Queue: reconcile every operator/actor-reported
-        # change queued since the last cycle (POST /planet/perturbations,
-        # ReportWorldPerturbationCapability) into the Global World State --
-        # additive to the simulated noise above, not a replacement for it
-        # (see kernel/society/perturbation_queue.py). Also feeds Deja Vu:
-        # any actor with a standing plan that references one of these
-        # entity_ids gets its reasoning replayed under the updated state.
-        _perturbation_queue_started = time.perf_counter()
-        touched_entity_ids: set[str] = set()
-        for queued in self._perturbation_queue.drain():
-            self._world_model.record_event(
-                WorldEvent(
-                    event_type=EventType.WORLD_UPDATE,
-                    entity_id=queued.entity_id,
-                    description=queued.description,
-                    attributes=dict(queued.attributes),
-                    source_actor_id=queued.source,
-                )
-            )
-            if queued.entity_id:
-                touched_entity_ids.add(queued.entity_id)
-        perturbation_queue_ms = (time.perf_counter() - _perturbation_queue_started) * 1000
 
         deja_vu_ms = 0.0
         if touched_entity_ids:
