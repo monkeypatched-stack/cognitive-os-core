@@ -241,7 +241,7 @@ class ModelBackend:
         self._total_tokens += resp.usage.prompt_tokens + resp.usage.completion_tokens
         return resp.choices[0].message.content or ""
 
-    async def _ollama(self, prompt: str, system: str, max_tokens: int, **_: Any) -> str:
+    async def _ollama(self, prompt: str, system: str, max_tokens: int, **kwargs: Any) -> str:
         # Mirrors broca.agents.specification_discovery_agent.OllamaClient's
         # request shape (/api/chat, same message format) so both LLM paths
         # hit the local Ollama server identically.
@@ -274,7 +274,14 @@ class ModelBackend:
         # prior order's own relationship). num_ctx here overrides that
         # default per-request, independent of whatever Ollama's own
         # server-level default is configured to.
-        async with httpx.AsyncClient(timeout=120.0) as client:
+        # opt-in per call: request_timeout (read seconds) / connect_timeout let a caller with a longer
+        # generation budget (e.g. the learning actor's remix) keep the HTTP read open past 120s; every
+        # other caller keeps the 120s default
+        timeout = httpx.Timeout(120.0)
+        if kwargs.get("request_timeout"):
+            read = float(kwargs["request_timeout"])
+            timeout = httpx.Timeout(read, connect=float(kwargs.get("connect_timeout") or min(read, 10.0)))
+        async with httpx.AsyncClient(timeout=timeout) as client:
             resp = await client.post(
                 f"{base_url}/api/chat",
                 json={
@@ -282,6 +289,8 @@ class ModelBackend:
                     "messages": messages,
                     "stream": False,
                     "options": {"num_ctx": 8192},
+                    # opt-in: response_format="json" asks Ollama to constrain the reply to valid JSON
+                    **({"format": "json"} if kwargs.get("response_format") == "json" else {}),
                 },
             )
         resp.raise_for_status()
