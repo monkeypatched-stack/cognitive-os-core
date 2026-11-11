@@ -78,6 +78,25 @@ class MongoAuditStore:
 
     def __init__(self, collection: Any = None) -> None:
         self._collection = collection
+        self._unique_index: bool | None = None  # None = not tried yet
+
+    def _ensure_unique_index(self, col: Any) -> bool:
+        """A unique index on entry_id makes the append-only check part of the insert.
+        Without it every append scanned the whole collection (measured: 431k records,
+        444 ms per append, ~2 s added to every governed call)."""
+        if self._unique_index is None:
+            try:
+                col.create_index(
+                    "entry_id",
+                    unique=True,
+                    name="entry_id_unique",
+                    partialFilterExpression={"entry_id": {"$exists": True}},
+                )
+                self._unique_index = True
+            except Exception as exc:  # duplicates already stored, no permission, or a test double
+                logger.warning("audit: no unique entry_id index (%r); append checks before inserting", exc)
+                self._unique_index = False
+        return self._unique_index
 
     def _col(self) -> Any:
         if self._collection is not None:
@@ -96,15 +115,18 @@ class MongoAuditStore:
     def append(self, tenant_id: str, event_type: str, payload: dict[str, Any]) -> None:
         entry_id = str(payload.get("entry_id") or uuid4())
         col = self._col()
+        doc = {**payload, "tenant_id": tenant_id, "_immutable": True}
+        if self._ensure_unique_index(col):
+            from pymongo.errors import DuplicateKeyError
+
+            try:
+                col.insert_one(doc)
+            except DuplicateKeyError as exc:
+                raise AuditPersistenceError("audit records are append-only; refuse overwrite") from exc
+            return
         if col.find_one({"entry_id": entry_id}):
             raise AuditPersistenceError("audit records are append-only; refuse overwrite")
-        col.insert_one(
-            {
-                **payload,
-                "tenant_id": tenant_id,
-                "_immutable": True,
-            }
-        )
+        col.insert_one(doc)
 
     def find(
         self,
